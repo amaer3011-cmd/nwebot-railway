@@ -11,6 +11,31 @@ export const GOOGLE_FONTS_IMPORTS = `
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" onload="if(window.renderMathInElement) renderMathInElement(document.body);"></script>
 `;
 
+// قواعد مشتركة لضبط إخراج PDF بصرف النظر عن الهوية البصرية التي اختارها النموذج.
+// الهدف: تدفق طبيعي للمحتوى، منع انقسام البطاقات والجداول، وإبقاء الفوتر أسفل الصفحة.
+export const PRINT_LAYOUT_OVERRIDES = `
+<style id="motafawiq-print-layout">
+  @page { size: A4 portrait; margin: 0; }
+  html, body { margin: 0 !important; padding: 0 !important; }
+  body { overflow-x: hidden; }
+  .pg {
+    min-height: 296mm !important;
+    height: 296mm !important;
+    justify-content: flex-start !important;
+    overflow: hidden !important;
+  }
+  .pg > .footer { margin-top: auto !important; }
+  .content-wrapper { width: 100% !important; max-width: 100% !important; }
+  .section-header, .section-title, .card-simple, .card-def, .card-warn,
+  .card-trick, .card-gold, .concept-map, .question-card, .answer-key,
+  table, tr, img { break-inside: avoid !important; page-break-inside: avoid !important; }
+  .section-header, .section-title { break-after: avoid !important; page-break-after: avoid !important; }
+  p { orphans: 3; widows: 3; }
+  img { max-width: 100%; height: auto; }
+  table.custom-table { table-layout: fixed; }
+</style>
+`;
+
 /**
  * تنظيف وحظر أي نصوص تمهيدية أو ختامية من الـ AI لضمان مخرج HTML نقي 100% مع دعم المعادلات ورابط القناة
  */
@@ -36,6 +61,10 @@ export function processGeneratedHtml(htmlCode) {
   // 3. تضمين الخطوط ومكتبة المعادلات KaTeX بالهيد إن لم تكن موجودة
   if (!cleanHtml.includes('fonts.googleapis.com') && cleanHtml.includes('<head>')) {
     cleanHtml = cleanHtml.replace('<head>', `<head>\n${GOOGLE_FONTS_IMPORTS}`);
+  }
+
+  if (cleanHtml.includes('<head>') && !cleanHtml.includes('motafawiq-print-layout')) {
+    cleanHtml = cleanHtml.replace('</head>', `${PRINT_LAYOUT_OVERRIDES}\n</head>`);
   }
 
   // 4. زر الطباعة العائم ورابط القناة الرسمي
