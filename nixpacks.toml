@@ -1,0 +1,25 @@
+# nixpacks.toml — Railway build config for Al-Motafawiq Bot (Puppeteer + Chromium)
+
+[phases.setup]
+nixPkgs = [
+  "nodejs_20",
+  "chromium",
+  "nss",
+  "freetype",
+  "freetype.dev",
+  "harfbuzz",
+  "ca-certificates",
+  "ttf-opensans",
+  "fontconfig"
+]
+
+[phases.install]
+cmds = [
+  "npm ci --omit=dev"
+]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "node index.js"

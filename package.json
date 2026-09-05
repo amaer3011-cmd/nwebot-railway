@@ -1,0 +1,19 @@
+{
+  "name": "al-motafawiq-telegram-bot",
+  "version": "1.2.0",
+  "description": "Telegram AI Assistant Bot for Al-Motafawiq Educational Series with Multi-Source Extraction, Voice Notes, PDF Rendering, Telegram Quizzes & Admin Control",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.0",
+    "dotenv": "^16.4.7",
+    "grammy": "^1.35.0",
+    "pdf-parse": "^1.1.1",
+    "puppeteer": "^24.4.0",
+    "youtube-transcript": "^1.2.1"
+  }
+}

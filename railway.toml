@@ -1,0 +1,16 @@
+# railway.toml — Railway deployment configuration for Al-Motafawiq Bot
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "node index.js"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[deploy.healthcheck]
+path = "/health"
+initialDelaySeconds = 10
+periodSeconds = 30
+timeoutSeconds = 10
+failureThreshold = 3
