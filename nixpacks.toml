@@ -9,7 +9,6 @@ nixPkgs = [
   "freetype.dev",
   "harfbuzz",
   "cacert",
-  "ttf-opensans",
   "fontconfig"
 ]
 
