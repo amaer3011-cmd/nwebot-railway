@@ -66,8 +66,10 @@ export async function generateInteractiveQuiz({
 
         const subjectInfo = detectSubjectGuidelines(contentText, explicitTrack);
 
-        const prompt = `
-أنت خبير تربوي متخصص وموجه أول ومستشار مادة في وضع امتحانات وبنوك أسئلة «البكالوريا المصرية 2027» بمساراتها الأربعة (الطب، الهندسة، الأعمال، الآداب).
+    const prompt = `
+أنت خبير تربوي متخصص في إنشاء كويزات من **الدرس المصدر المرفق فقط**.
+⚠️ قاعدة أولوية مطلقة: لا تنشئ أي سؤال من معلومات عامة أو من مادة أخرى. كل سؤال وكل إجابة وتفسير يجب أن يكون قابلاً للإسناد إلى النص المرجعي أدناه.
+⚠️ إذا كان النص درس فيزياء، فكل الأسئلة فيزياء فقط؛ ممنوع أسئلة النحو أو البلاغة أو التاريخ أو الأحياء أو أي مادة لا تظهر في النص.
 📌 التخصص والمادة المستهدفة: **${subjectInfo.subjectName}** (${subjectInfo.trackTitle})
 
 المطلوب: قم بإنشاء ${count} سؤال بنمط: ${typePromptMap[quizType] || typePromptMap.mcq}
@@ -97,7 +99,7 @@ ${subjectInfo.generalPrinciples.map(p => `• ${p}`).join('\n')}
   }
 ]
 
-المحتوى العلمي المرجعي:
+المحتوى العلمي المرجعي الوحيد المسموح باستخدامه:
 ${contentText.slice(0, 6000)}
 `;
 
@@ -106,13 +108,23 @@ ${contentText.slice(0, 6000)}
         const quizItems = JSON.parse(text);
 
         if (Array.isArray(quizItems) && quizItems.length > 0) {
-          return quizItems.map(item => ({
-            question: item.question.slice(0, 255),
-            options: item.options.map(opt => String(opt).slice(0, 100)),
-            correctOptionIndex: Math.min(Math.max(0, item.correctOptionIndex || 0), item.options.length - 1),
-            explanation: item.explanation ? item.explanation.slice(0, 250) : '',
-            learningOutcome: item.learningOutcome ? item.learningOutcome.slice(0, 100) : 'نواتج تعلم البكالوريا 2027',
-            difficulty: item.difficulty || 'mixed'
+          const validItems = quizItems.filter(item =>
+            item && typeof item.question === 'string' && item.question.trim().length >= 10 &&
+            Array.isArray(item.options) && item.options.length >= 2 &&
+            item.options.every(opt => typeof opt === 'string' && opt.trim().length > 0) &&
+            Number.isInteger(Number(item.correctOptionIndex)) &&
+            Number(item.correctOptionIndex) >= 0 && Number(item.correctOptionIndex) < item.options.length
+          );
+
+          if (validItems.length === 0) throw new Error('النموذج لم يُرجع أسئلة منظمة وصالحة');
+
+          return validItems.slice(0, count).map(item => ({
+            question: item.question.trim().slice(0, 500),
+            options: item.options.slice(0, 4).map(opt => String(opt).trim().slice(0, 180)),
+            correctOptionIndex: Math.min(Number(item.correctOptionIndex), Math.min(item.options.length, 4) - 1),
+            explanation: item.explanation ? String(item.explanation).trim().slice(0, 400) : 'الإجابة مستندة إلى القاعدة أو المثال الوارد في الدرس.',
+            learningOutcome: item.learningOutcome ? String(item.learningOutcome).trim().slice(0, 140) : 'تطبيق ناتج تعلم من الدرس المصدر',
+            difficulty: ['easy', 'medium', 'hard'].includes(item.difficulty) ? item.difficulty : 'mixed'
           }));
         }
       } catch (err) {
@@ -751,4 +763,3 @@ export async function generateSelfGradingHtmlQuiz({
 
   return htmlContent;
 }
-
