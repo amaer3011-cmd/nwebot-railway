@@ -32,7 +32,7 @@ export async function generateInteractiveQuiz({
   if (!apiKey) throw new Error('مفتاح API غير متوفر');
 
   const keyPool = getQuizApiKeyPool(apiKey);
-  const modelsToTry = [modelName, 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash'];
+  const modelsToTry = [modelName, 'gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.6-flash'];
   const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
   let lastError = null;
 
@@ -154,7 +154,7 @@ export async function generateQuizPdf({
   if (!apiKey) throw new Error('مفتاح API غير متوفر');
 
   const keyPool = getQuizApiKeyPool(apiKey);
-  const modelsToTry = [modelName, 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash'];
+  const modelsToTry = [modelName, 'gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.6-flash'];
   const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
   let lastError = null;
 

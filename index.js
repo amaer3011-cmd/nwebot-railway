@@ -61,6 +61,18 @@ async function safeReply(ctx, text, options = {}, retries = 2) {
   }
 }
 
+async function safeEditMessageText(ctx, text, options = {}) {
+  try {
+    return await ctx.editMessageText(text, options);
+  } catch (err) {
+    const message = err?.description || err?.message || '';
+    if (message.includes('there is no text to edit') || message.includes('message is not modified')) {
+      return await ctx.reply(text, options);
+    }
+    throw err;
+  }
+}
+
 // 🛡️ حماية الـ Callbacks من أخطاء انتهاء الصلاحية (Query too old)
 bot.use(async (ctx, next) => {
   if (ctx.callbackQuery) {
@@ -509,7 +521,7 @@ bot.on('callback_query:data', async (ctx) => {
   } else if (data === 'quiz_new_topic') {
     session.awaitingQuizTopic = true;
     await ctx.answerCallbackQuery();
-    await ctx.editMessageText(`
+    await safeEditMessageText(ctx, `
 ✍️ **أرسل النص أو الموضوع المطلوب لإنشاء الكويز:**
 
 يمكنك إرسال:
@@ -530,7 +542,7 @@ bot.on('callback_query:data', async (ctx) => {
     kb.text('➕ إرسال محتوى جديد للدرس', 'prompt_new_lesson_content').row()
       .text('🔙 القائمة الرئيسية', 'main_menu');
 
-    await ctx.editMessageText(`
+    await safeEditMessageText(ctx, `
 📄 **إنشاء ملزمة شرح A4 (معايير البكالوريا 2027):**
 
 تفريغ وتنسيق كامل حتى 10 صفحات مع قسم «حِلّ بإيدك» ومفتاح الإجابات.
@@ -576,7 +588,7 @@ bot.on('callback_query:data', async (ctx) => {
       .text('📄 تصدير ملزمة A4 PDF من هذا الدرس', `hist_pdf_${idx}`).row()
       .text('🔙 رجوع لمكتبة الدروس', 'menu_library');
 
-    await ctx.editMessageText(`
+    await safeEditMessageText(ctx, `
 📖 **الدرس المختار:** ${item.title}
 ⏱️ **تاريخ الحفظ:** ${item.createdAt || 'مؤخراً'}
 
@@ -828,7 +840,7 @@ async function showLessonLibrary(ctx, session) {
       .text('🔙 القائمة الرئيسية', 'main_menu');
     const msg = `📚 **مكتبة الدروس السابقة فارغة حالياً.**\nقم بإرسال درسك الأول وسيحفظه البوت تلقائياً هنا لتعود إليه في أي وقت!`;
     if (ctx.callbackQuery) {
-      await ctx.editMessageText(msg, { parse_mode: 'Markdown', reply_markup: emptyKb });
+      await safeEditMessageText(ctx, msg, { parse_mode: 'Markdown', reply_markup: emptyKb });
     } else {
       await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: emptyKb });
     }
@@ -850,7 +862,7 @@ async function showLessonLibrary(ctx, session) {
 `;
 
   if (ctx.callbackQuery) {
-    await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: kb });
+    await safeEditMessageText(ctx, text, { parse_mode: 'Markdown', reply_markup: kb });
   } else {
     await ctx.reply(text, { parse_mode: 'Markdown', reply_markup: kb });
   }

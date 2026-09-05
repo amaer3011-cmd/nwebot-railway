@@ -41,7 +41,7 @@ export async function generateLessonHtml({
   }
 
   const systemInstruction = getSystemPrompt(selectedIdentity, isPartner, userPrompt, track);
-  const modelsToTry = [modelName, 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+      const modelsToTry = [modelName, 'gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest'];
   const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
   let lastError = null;
 
@@ -138,7 +138,7 @@ export async function modifyLessonHtml({
 }) {
   const keyPool = getApiKeyPool(apiKey);
   const systemInstruction = getSystemPrompt(selectedIdentity, isPartner, editInstructions || existingHtml, track);
-  const modelsToTry = [modelName, 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash'];
+  const modelsToTry = [modelName, 'gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.6-flash'];
   const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
   let lastError = null;
 
