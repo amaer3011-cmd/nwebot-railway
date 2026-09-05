@@ -33,6 +33,17 @@ export const PRINT_LAYOUT_OVERRIDES = `
   p { orphans: 3; widows: 3; }
   img { max-width: 100%; height: auto; }
   table.custom-table { table-layout: fixed; }
+  .formula-box {
+    margin: 3mm 0 !important;
+    padding: 3mm 5mm !important;
+    border: 2px solid #EC275F !important;
+    border-radius: 10px !important;
+    background: #FFF7FA !important;
+    text-align: center !important;
+    break-inside: avoid !important;
+  }
+  .formula-box .katex-display { margin: 2mm 0 !important; overflow-x: auto; overflow-y: hidden; }
+  .formula-box .formula-title { font-weight: 800; color: #2B3445; margin-bottom: 1mm; }
 </style>
 `;
 
@@ -57,6 +68,11 @@ export function processGeneratedHtml(htmlCode) {
   // 2. ضمان عدم وجود أي نصوص خارج الوسوم الرئيسية
   cleanHtml = cleanHtml.replace(/^[^<]+<!DOCTYPE/i, '<!DOCTYPE');
   cleanHtml = cleanHtml.replace(/<\/html>[\s\S]*$/i, '</html>');
+
+  // تحويل الصيغة الشائعة التي يرسلها النموذج ($...$) إلى صيغة KaTeX inline.
+  // كما نعالج \text{...} حتى لا تظهر ككلمة خام داخل ملف PDF.
+  cleanHtml = cleanHtml.replace(/\$([^$\n]+)\$/g, (_, expression) => `\\(${expression}\\)`);
+  cleanHtml = cleanHtml.replace(/\\text\{([^{}]+)\}/g, '\\mathrm{$1}');
 
   // 3. تضمين الخطوط ومكتبة المعادلات KaTeX بالهيد إن لم تكن موجودة
   if (!cleanHtml.includes('fonts.googleapis.com') && cleanHtml.includes('<head>')) {

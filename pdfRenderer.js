@@ -106,6 +106,20 @@ export async function renderHtmlDirectlyToPdf(htmlString, isLandscape = false) {
       timeout: 45000
     });
 
+    await page.evaluate(async () => {
+      if (document.fonts?.ready) await document.fonts.ready;
+      if (window.renderMathInElement) {
+        window.renderMathInElement(document.body, {
+          delimiters: [
+            { left: '\\[', right: '\\]', display: true },
+            { left: '\\(', right: '\\)', display: false }
+          ],
+          throwOnError: false
+        });
+      }
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+
     await page.emulateMediaType('print');
 
     const pdfBuffer = await page.pdf({
