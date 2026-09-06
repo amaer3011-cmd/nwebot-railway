@@ -600,7 +600,8 @@ bot.on('callback_query:data', async (ctx) => {
     const item = session.lessonHistory[idx];
     if (item) {
       await ctx.answerCallbackQuery({ text: '🌐 جاري توليد كويز HTML التفاعلي...' });
-      await handleQuizHtml(ctx, session, item.contentText, item.title);
+      const historySource = extractTextFromHtml(item.html || '').trim() || item.contentText;
+      await handleQuizHtml(ctx, session, historySource, item.title);
     }
 
   } else if (data.startsWith('hist_quiz_pdf_')) {
@@ -608,7 +609,8 @@ bot.on('callback_query:data', async (ctx) => {
     const item = session.lessonHistory[idx];
     if (item) {
       await ctx.answerCallbackQuery({ text: '📋 جاري توليد كويز PDF...' });
-      await handleQuizPdf(ctx, session, item.contentText, item.title);
+      const historySource = extractTextFromHtml(item.html || '').trim() || item.contentText;
+      await handleQuizPdf(ctx, session, historySource, item.title);
     }
 
   } else if (data.startsWith('hist_quiz_poll_')) {
@@ -616,7 +618,8 @@ bot.on('callback_query:data', async (ctx) => {
     const item = session.lessonHistory[idx];
     if (item) {
       await ctx.answerCallbackQuery({ text: '⚡ جاري إرسال الكويز التفاعلي...' });
-      await handleQuizPoll(ctx, session, item.contentText, item.title);
+      const historySource = extractTextFromHtml(item.html || '').trim() || item.contentText;
+      await handleQuizPoll(ctx, session, historySource, item.title);
     }
 
   } else if (data.startsWith('hist_pdf_')) {
@@ -972,11 +975,15 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
 
     // استخراج اسم الدرس ديناميكياً لتسمية الملف باسم محتواه
     const lessonTitle = extractLessonTitle(htmlCode, 'ملزمة_المتفوق');
+    const generatedLessonText = extractTextFromHtml(htmlCode).trim();
+    const quizSourceText = generatedLessonText.length >= 50 ? generatedLessonText : (prompt || '');
     
     // حفظ النسخة في جلسة المستخدم لتسهيل التعديلات والكويزات القادمة
     session.lastHtml = htmlCode;
     session.lastTitle = lessonTitle;
-    session.lastContentText = prompt;
+    // مهم: الكويز يجب أن يعتمد على محتوى الملزمة المستخرج من HTML، لا على
+    // prompt عام مثل «حلل الصور»، وإلا سيحصل النموذج على مصدر غير علمي.
+    session.lastContentText = quizSourceText;
     session.awaitingEdit = false;
 
     // 📚 حفظ في مكتبة الدروس السابقة (حتى 10 دروس)
@@ -984,7 +991,7 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
     const historyItem = {
       id: 'lesson_' + Date.now(),
       title: lessonTitle.replace(/_/g, ' '),
-      contentText: prompt || extractTextFromHtml(htmlCode),
+      contentText: quizSourceText,
       html: htmlCode,
       createdAt: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
     };
