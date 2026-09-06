@@ -67,6 +67,29 @@ export async function generateLessonHtml({
           }
         });
 
+        let visualDossier = '';
+        if (allImages.length > 0) {
+          try {
+            const inspectionModel = genAI.getGenerativeModel({
+              model: currentModel,
+              generationConfig: { temperature: 0.05, responseMimeType: 'application/json', maxOutputTokens: 16384 }
+            });
+            const inspectionPrompt = `أنت محلل صور تعليمية وOCR دقيق. افحص كل الصور واحدة واحدة وأعد JSON فقط:
+{"documentTitle":"العنوان","subject":"المادة","pages":[{"pageNumber":1,"headings":[],"verbatimText":"النص والأرقام كما ظهرت","formulas":[],"examples":[],"figuresAndTables":[],"uncertainParts":[]}],"coverageChecklist":[]}
+قواعد صارمة: لا تخترع نصاً غير ظاهر. ضع الكلمات أو الأرقام غير المقروءة في uncertainParts بدلاً من تخمينها. يجب تمثيل كل صورة في pages والحفاظ على الوحدات والأرقام.
+`;
+            const inspectionParts = [inspectionPrompt, ...allImages.filter(img => img.buffer).map(img => ({ inlineData: { data: img.buffer.toString('base64'), mimeType: img.mimeType || 'image/jpeg' } }))];
+            const inspectionResult = await inspectionModel.generateContent(inspectionParts);
+            const inspected = JSON.parse(inspectionResult.response.text());
+            if (inspected?.pages?.length && inspected?.coverageChecklist?.length) {
+              visualDossier = JSON.stringify(inspected, null, 2).slice(0, 50000);
+              console.log(`🔎 تم تحليل ${inspected.pages.length} صورة/صفحة وإنشاء قائمة تغطية من ${inspected.coverageChecklist.length} موضوعاً.`);
+            }
+          } catch (inspectionError) {
+            console.warn('⚠️ تعذر التحليل المنظم للصور، سيتم استخدام الصور مباشرة:', inspectionError.message);
+          }
+        }
+
         let contentParts = [];
 
         let sourceTypeInstruction = '';
@@ -88,6 +111,8 @@ ${sourceTypeInstruction}
 المطلوب: إنشاء ملزمة / مراجعة A4 بصيغة HTML كاملة ومكتفية بذاتها وفقاً لقواعد «المتفوق» للبكالوريا المصرية 2027، مقسمة على عدد الصفحات المناسب بحسب طول المحتوى (من 2 إلى 10 صفحات A4).
 ⏳ **مرحلة الدقة قبل الإخراج:** لا تبدأ كتابة HTML مباشرة. أولاً افحص كل الصور/النصوص، وأنشئ داخلياً جرداً لكل عنوان وقانون ومثال ونظرية ورمز ظاهر، ثم طابق الجرد مع الأقسام الناتجة. يجب ألا يسقط أي موضوع، وخاصة الجبر والأعداد المركبة وذات الحدين والهندسة والدوائر عند ظهورها في المصدر.
 🔍 **مراجعة نهائية إلزامية:** قبل إخراج HTML راجع الأرقام والرموز العربية والـLaTeX، واحذف أي رمز غريب أو placeholder، وتأكد أن كل قسم من المصدر ظهر في الملزمة مرة واحدة على الأقل دون اختراع موضوع خارج المصدر. لا تعرض جردك الداخلي؛ أخرج HTML فقط.
+
+${visualDossier ? `📚 تقرير التحليل البصري الموثق — استخدمه كخريطة تغطية ولا تخالف النص الظاهر في الصور:\n${visualDossier}` : ''}
 
 المحتوى النصي أو التوضيحي المرفق:
 ${userPrompt || 'قم بتحليل وقراءة واستخراج كافة التفاصيل والشروحات والمعادلات من الصور والمحتوى المرفق ودمجها في ملزمة واحدة متكاملة.'}
