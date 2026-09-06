@@ -27,6 +27,22 @@ function normalizeQuizItem(item) {
   };
 }
 
+function normalizeEvidenceText(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .replace(/[\u064B-\u065F\u0670]/g, '')
+    .replace(/[\u0640]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function hasSourceEvidence(item, sourceText) {
+  const evidence = normalizeEvidenceText(item?.sourceEvidence);
+  const source = normalizeEvidenceText(sourceText);
+  return evidence.length >= 8 && source.includes(evidence);
+}
+
 /**
  * مولّد الكويزات الاحترافي لبوت «المتفوق»
  * يدعم:
@@ -129,6 +145,7 @@ ${subjectInfo.generalPrinciples.map(p => `• ${p}`).join('\n')}
 📝 **تنسيق أسئلة الاختيار من متعدد:**
 - يجب أن يكون كل خيار في عنصر مستقل داخل مصفوفة options؛ لا تدمج خيارين في نص واحد ولا تستخدم مسافات أفقية للفصل.
 - عند عرض الخيارات خارج JSON، استخدم سطوراً مستقلة بالترتيب: (أ) ثم (ب) ثم (ج) ثم (د).
+- أضف لكل سؤال الحقل sourceEvidence، وهو اقتباس حرفي من 8 إلى 20 كلمة متتالية من النص المرجعي يثبت مصدر السؤال. ممنوع إعادة صياغة الاقتباس أو اختراع اقتباس غير موجود.
 
 🔢 **ضبط المعطيات والوحدات:**
 - أي مسألة أو تدريب مقالي يجب أن يحتوي على قيم عددية صريحة للارتفاع والسرعة والزمن وغيرها عند الحاجة؛ لا تترك قيمة فارغة أو صفراً دون قصد.
@@ -147,6 +164,7 @@ ${subjectInfo.generalPrinciples.map(p => `• ${p}`).join('\n')}
     "correctOptionIndex": 0,
     "explanation": "شرح موجز ودقيق لسبب صحة هذا الخيار وناتج التعلم المستهدف",
     "learningOutcome": "ناتج التعلم المستهدف (مثل: استنتاج علاقة / تطبيق قانون عكسي / تحليل دلالة)",
+    "sourceEvidence": "اقتباس حرفي قصير من النص المرجعي",
     "difficulty": "easy|medium|hard"
   }
 ]
@@ -165,10 +183,13 @@ ${contentText.slice(0, 6000)}
             Array.isArray(item.options) && item.options.length >= 2 &&
             item.options.every(opt => typeof opt === 'string' && opt.trim().length > 0) &&
             Number.isInteger(Number(item.correctOptionIndex)) &&
-            Number(item.correctOptionIndex) >= 0 && Number(item.correctOptionIndex) < item.options.length
+            Number(item.correctOptionIndex) >= 0 && Number(item.correctOptionIndex) < item.options.length &&
+            hasSourceEvidence(item, contentText)
           );
 
-          if (validItems.length === 0) throw new Error('النموذج لم يُرجع أسئلة منظمة وصالحة');
+          if (validItems.length < count) {
+            throw new Error('النموذج أرجع أسئلة خارج الموضوع أو بدون اقتباس مصدر حرفي صالح');
+          }
 
           return validItems.slice(0, count).map(item => ({
             ...normalizeQuizItem(item),
@@ -177,6 +198,7 @@ ${contentText.slice(0, 6000)}
             correctOptionIndex: Math.min(Number(item.correctOptionIndex), Math.min(item.options.length, 4) - 1),
             explanation: item.explanation ? normalizeMathNotation(String(item.explanation)).trim().slice(0, 400) : 'الإجابة مستندة إلى القاعدة أو المثال الوارد في الدرس.',
             learningOutcome: item.learningOutcome ? String(item.learningOutcome).trim().slice(0, 140) : 'تطبيق ناتج تعلم من الدرس المصدر',
+            sourceEvidence: String(item.sourceEvidence || '').trim().slice(0, 220),
             difficulty: ['easy', 'medium', 'hard'].includes(item.difficulty) ? item.difficulty : 'mixed'
           }));
         }
@@ -248,6 +270,8 @@ export async function generateQuizPdf({
         const prompt = `
 أنت مصمم جرافيك ومدرس أول ومستشار مادة محترف خبير في إنشاء كويزات احترافية لسلسلة «المتفوق» المخصصة حصرياً لنظام «البكالوريا المصرية 2027» بمساراتها الأربعة.
 📌 المادة والتخصص: **${subjectInfo.subjectName}** (${subjectInfo.trackTitle})
+
+⚠️ **عزل المصدر إلزامي:** أنشئ كل سؤال وكل اختيار وكل حل من المحتوى العلمي المرجعي الموجود في نهاية التعليمات فقط. ممنوع إضافة معلومات عامة أو قوانين أو أمثلة غير موجودة في المصدر، وإذا لم يكفِ المصدر لعدد الأسئلة فأنشئ أسئلة أقل مرتبطة بالمصدر ولا تملأ العدد بالتخمين.
 
 ⚠️ **حظر هام:** مخرجك يجب أن يكون **كود HTML نقي** يبدأ فوراً بـ \`<!DOCTYPE html>\` وينتهي بـ \`</html>\` بدون أي نص خارجي.
 
