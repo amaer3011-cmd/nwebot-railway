@@ -4,7 +4,7 @@ import { sanitizeDocumentHtml, publicErrorMessage } from '../htmlSecurity.js';
 import { getApiKeyPool } from '../apiKeyManager.js';
 import { extractLessonTitle } from '../aiService.js';
 import { detectSubjectGuidelines } from '../baccalaureateStandards2027.js';
-import { createUnansweredQuizHtml } from '../quizGenerator.js';
+import { createUnansweredQuizHtml, validateInteractiveQuizItems } from '../quizGenerator.js';
 
 process.env.GEMINI_API_KEYS = 'first-key, second-key, first-key';
 process.env.GEMINI_API_KEY = 'third-key';
@@ -48,4 +48,43 @@ test('unanswered essay quiz removes answer key and keeps printable questions', (
   assert.match(output, /سؤال مقالي/);
   assert.doesNotMatch(output, /الإجابة النموذجية/);
   assert.match(output, /display: none/);
+});
+
+test('interactive quiz validator rejects duplicate questions and duplicate options', () => {
+  const sourceText = 'القوة المؤثرة على الجسم تساوي الكتلة مضروبة في العجلة وتحدد حركة الجسم';
+  const base = {
+    options: ['القوة', 'الكتلة', 'العجلة', 'الزمن'],
+    correctOptionIndex: 0,
+    explanation: 'القوة والعجلة والكتلة من مفاهيم الدرس',
+    sourceEvidence: 'القوة المؤثرة على الجسم تساوي الكتلة مضروبة في العجلة',
+    cognitiveLevel: 'analysis',
+    questionType: 'concept',
+    difficulty: 'medium'
+  };
+  const duplicate = [
+    { ...base, question: 'ما العلاقة بين القوة والكتلة والعجلة؟', learningOutcome: 'استنتاج العلاقة الأساسية' },
+    { ...base, question: 'ما العلاقة بين القوة والكتلة والعجلة؟', learningOutcome: 'تطبيق القانون' },
+    { ...base, question: 'كيف تتغير القوة عند تغير العجلة؟', learningOutcome: 'تحليل أثر التغير' }
+  ];
+  const result = validateInteractiveQuizItems(duplicate, { count: 3, sourceText });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /مكرر/);
+});
+
+test('interactive quiz validator rejects repeated answer options', () => {
+  const sourceText = 'السرعة تساوي المسافة مقسومة على الزمن وتصف معدل تغير المسافة';
+  const items = Array.from({ length: 3 }, (_, index) => ({
+    question: `سؤال مختلف رقم ${index + 1} عن السرعة والزمن والمسافة`,
+    options: ['نفس الاختيار', 'نفس الاختيار', 'اختيار ثالث', 'اختيار رابع'],
+    correctOptionIndex: 0,
+    explanation: 'السرعة والمسافة والزمن من مفاهيم المصدر',
+    learningOutcome: `ناتج تعلم ${index + 1}`,
+    sourceEvidence: 'السرعة تساوي المسافة مقسومة على الزمن',
+    cognitiveLevel: index === 0 ? 'application' : 'analysis',
+    questionType: 'concept',
+    difficulty: 'medium'
+  }));
+  const result = validateInteractiveQuizItems(items, { count: 3, sourceText });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /اختيار/);
 });

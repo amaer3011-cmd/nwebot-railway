@@ -81,6 +81,60 @@ function hasCognitiveQuality(items, count) {
     new Set(questions).size === questions.length;
 }
 
+function parseModelJson(text) {
+  const normalized = String(text || '').trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+  return JSON.parse(normalized);
+}
+
+export function validateInteractiveQuizItems(items, { count, quizType = 'mcq', sourceText = '' } = {}) {
+  if (!Array.isArray(items) || items.length < count) return { ok: false, reason: 'عدد الأسئلة أقل من المطلوب' };
+  const selected = items.slice(0, count);
+  const normalizedQuestions = new Set();
+  const normalizedOutcomes = new Set();
+  const expectedOptionCount = quizType === 'truefalse' ? 2 : null;
+
+  for (const item of selected) {
+    const question = normalizeQuizItem(item);
+    const questionKey = normalizeEvidenceText(question.question);
+    if (question.question.length < 10 || normalizedQuestions.has(questionKey)) return { ok: false, reason: 'يوجد سؤال فارغ أو مكرر' };
+    if (!Array.isArray(question.options) || (expectedOptionCount && question.options.length !== expectedOptionCount) || (!expectedOptionCount && (question.options.length < 2 || question.options.length > 4))) return { ok: false, reason: 'عدد الاختيارات غير صالح' };
+    const optionKeys = question.options.map(normalizeEvidenceText);
+    if (optionKeys.some(option => !option) || new Set(optionKeys).size !== optionKeys.length) return { ok: false, reason: 'يوجد اختيار فارغ أو مكرر' };
+    const correctIndex = Number(item.correctOptionIndex);
+    if (!Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex >= question.options.length) return { ok: false, reason: 'مفتاح إجابة غير صالح' };
+    if (!hasSourceEvidence(item, sourceText) || !matchesSourceConcepts(item, sourceText)) return { ok: false, reason: 'السؤال غير مثبت بالمصدر' };
+    normalizedQuestions.add(questionKey);
+    if (question.learningOutcome) normalizedOutcomes.add(normalizeEvidenceText(question.learningOutcome));
+  }
+
+  if (normalizedOutcomes.size < Math.min(3, count)) return { ok: false, reason: 'نواتج التعلم متكررة أو ناقصة' };
+  if (!hasCognitiveQuality(selected, count)) return { ok: false, reason: 'التوزيع المعرفي غير كافٍ' };
+  return { ok: true, items: selected };
+}
+
+function validateGeneratedQuizHtml(html) {
+  const value = String(html || '').trim();
+  const problems = [];
+  if (!/^<!doctype html>/i.test(value) || !/<\/html>\s*$/i.test(value)) problems.push('بنية HTML غير مكتملة');
+  if (!/class=["'][^"']*workspace-area/i.test(value)) problems.push('مساحات الحل غير موجودة');
+  if (!/class=["'][^"']*answer-key/i.test(value)) problems.push('مفتاح الإجابة غير موجود');
+  if (/<script\b/i.test(value)) problems.push('HTML المقال يحتوي على JavaScript غير مطلوب');
+  if (problems.length) throw new Error(`مخرج الكويز المقالي غير صالح: ${problems.join('، ')}`);
+  return value;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 /**
  * مولّد الكويزات الاحترافي لبوت «المتفوق»
  * يدعم:
@@ -227,27 +281,10 @@ ${contentText.slice(0, 12000)}
 
         const result = await model.generateContent(prompt);
         const text = result.response.text();
-        const quizItems = JSON.parse(text);
-
-        if (Array.isArray(quizItems) && quizItems.length > 0) {
-          const validItems = quizItems.filter(item =>
-            item && typeof item.question === 'string' && item.question.trim().length >= 10 &&
-            Array.isArray(item.options) && item.options.length >= 2 &&
-            item.options.every(opt => typeof opt === 'string' && opt.trim().length > 0) &&
-            Number.isInteger(Number(item.correctOptionIndex)) &&
-            Number(item.correctOptionIndex) >= 0 && Number(item.correctOptionIndex) < item.options.length &&
-            hasSourceEvidence(item, contentText) &&
-            matchesSourceConcepts(item, contentText)
-          );
-
-          if (validItems.length < count) {
-            throw new Error('النموذج أرجع أسئلة خارج الموضوع أو بدون اقتباس مصدر حرفي صالح');
-          }
-          if (!hasCognitiveQuality(validItems.slice(0, count), count)) {
-            throw new Error('النموذج أرجع كويزاً سطحياً أو مكرراً ولا يحقق توزيع الفهم والتطبيق والتحليل');
-          }
-
-          return validItems.slice(0, count).map(item => ({
+        const quizItems = parseModelJson(text);
+        const validation = validateInteractiveQuizItems(quizItems, { count, quizType, sourceText: contentText });
+        if (validation.ok) {
+          return validation.items.map(item => ({
             ...normalizeQuizItem(item),
             question: normalizeQuizItem(item).question.slice(0, 500),
             options: normalizeQuizItem(item).options.slice(0, 4).map(opt => String(opt).slice(0, 180)),
@@ -422,7 +459,7 @@ ${contentText.slice(0, 12000)}
         const responseText = result.response.text();
 
         if (responseText && responseText.length > 100) {
-          return processGeneratedHtml(responseText);
+          return processGeneratedHtml(validateGeneratedQuizHtml(responseText));
         }
       } catch (err) {
         console.warn(`فشلت محاولة كويز PDF بالمفتاح [${keyIndex + 1}/${keyPool.length}]:`, err.message);
@@ -480,9 +517,14 @@ export async function generateSelfGradingHtmlQuiz({
     throw new Error('لم يتم توليد أي أسئلة صالحة للكويز التفاعلي');
   }
 
-  const safeTitle = lessonTitle.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const safeSubject = subjectInfo.subjectName;
-  const questionsJson = JSON.stringify(questions);
+  const safeTitle = escapeHtml(lessonTitle);
+  const safeSubject = escapeHtml(subjectInfo.subjectName);
+  // حماية سياق JavaScript من أي نص مولّد يحتوي على </script> أو محارف HTML.
+  const questionsJson = JSON.stringify(questions)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 
   const htmlContent = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -864,7 +906,7 @@ export async function generateSelfGradingHtmlQuiz({
       q.options.forEach((opt, optIndex) => {
         optionsHtml += \`
           <label class="opt-label" id="opt-label-\${qIndex}-\${optIndex}">
-            <input type="radio" name="q\${qIndex}" value="\${optIndex}" onchange="updateProgress()">
+            <input type="radio" name="q\${qIndex}" value="\${optIndex}" aria-label="السؤال \${qIndex + 1}، الاختيار \${optIndex + 1}" onchange="updateProgress()">
             <span><strong>(${optionLabels[optIndex] || optIndex + 1})</strong> \${escapeHtml(opt)}</span>
           </label>
         \`;
@@ -879,7 +921,7 @@ export async function generateSelfGradingHtmlQuiz({
           \${optionsHtml}
         </div>
         <div class="explanation-box" id="exp-\${qIndex}">
-          <div class="learning-tag">🎯 \${q.learningOutcome || 'نواتج التعلم والتفكير 2027'}</div>
+          <div class="learning-tag">🎯 \${escapeHtml(q.learningOutcome || 'نواتج التعلم والتفكير 2027')}</div>
           <div>💡 <strong>التفسير والتحليل العلمي:</strong> \${escapeHtml(q.explanation)}</div>
         </div>
       \`;
