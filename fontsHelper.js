@@ -5,7 +5,7 @@
 export const GOOGLE_FONTS_IMPORTS = `
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Lalezar&family=Cairo:wght@600;700;800;900&family=Aref+Ruqaa:wght@700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@700&family=Cairo:wght@600;700;800;900&family=Lalezar&family=Noto+Sans+Arabic:wght@400;500;600;700;800&family=Poppins:wght@500;600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" onload="if(window.renderMathInElement) renderMathInElement(document.body);"></script>
@@ -15,9 +15,25 @@ export const GOOGLE_FONTS_IMPORTS = `
 // الهدف: تدفق طبيعي للمحتوى، منع انقسام البطاقات والجداول، وإبقاء الفوتر أسفل الصفحة.
 export const PRINT_LAYOUT_OVERRIDES = `
 <style id="motafawiq-print-layout">
-  @page { size: A4 portrait; margin: 0; }
-  html, body { margin: 0 !important; padding: 0 !important; }
-  body { overflow-x: hidden; }
+	  @page { size: A4 portrait; margin: 0; }
+	  html, body { margin: 0 !important; padding: 0 !important; }
+	  body {
+	    overflow-x: hidden;
+	    font-family: 'Noto Sans Arabic', 'Tajawal', 'Cairo', sans-serif !important;
+	    font-size: 12.2pt !important;
+	    line-height: 1.78 !important;
+	    color: #243247;
+	    text-rendering: optimizeLegibility;
+	  }
+	  h1, h2, h3, h4, .section-title, .answer-key-title, .quiz-badge {
+	    font-family: 'Cairo', 'Noto Sans Arabic', sans-serif !important;
+	    font-weight: 800 !important;
+	    line-height: 1.35 !important;
+	  }
+	  p, li, td, th { line-height: 1.78 !important; }
+	  p { margin: 0 0 2.4mm !important; }
+	  ul, ol { padding-inline-start: 7mm !important; margin: 1.5mm 0 2.5mm !important; }
+	  .en, .english, [dir="ltr"] { font-family: 'Poppins', 'Cairo', sans-serif !important; }
   .pg {
     min-height: 296mm !important;
     height: 296mm !important;
@@ -25,7 +41,8 @@ export const PRINT_LAYOUT_OVERRIDES = `
     overflow: hidden !important;
   }
   .pg > .footer { margin-top: auto !important; }
-  .content-wrapper { width: 100% !important; max-width: 100% !important; }
+	  .content-wrapper { width: 100% !important; max-width: 100% !important; }
+	  .content-wrapper > * { max-width: 100% !important; }
   .section-header, .section-title, .card-simple, .card-def, .card-warn,
   .card-trick, .card-gold, .concept-map, .question-card, .answer-key,
   table, tr, img { break-inside: avoid !important; page-break-inside: avoid !important; }
@@ -45,7 +62,20 @@ export const PRINT_LAYOUT_OVERRIDES = `
   .formula-box .katex-display { margin: 3mm 0 4mm !important; padding-bottom: 2mm !important; overflow-x: auto; overflow-y: hidden; }
   .formula-box .formula-title { font-weight: 800; color: #2B3445; margin-bottom: 2mm; }
   .formula-box + *, table + *, .katex-display + * { margin-top: 4mm !important; }
-  table td, table th { padding: 2.5mm 3mm !important; vertical-align: middle; }
+	  table td, table th { padding: 2.5mm 3mm !important; vertical-align: middle; }
+	  .question-card, .q-card, .quiz-card {
+	    border-radius: 10px !important;
+	    padding: 4mm !important;
+	    margin: 0 0 4mm !important;
+	    break-inside: avoid !important;
+	  }
+	  .option, .option-card, .opt-label {
+	    display: block !important;
+	    padding: 2.5mm 3.5mm !important;
+	    margin: 1.5mm 0 !important;
+	    line-height: 1.65 !important;
+	  }
+	  .answer-key { line-height: 1.65 !important; }
   .workspace-area {
     min-height: 28mm !important;
     margin: 4mm 0 6mm !important;

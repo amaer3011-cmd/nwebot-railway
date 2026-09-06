@@ -359,6 +359,9 @@ ${customCss}
 \`\`\`
 
 📐 تصميم الكويز:
+0. **الهرمية البصرية والخطوط:** استخدم Noto Sans Arabic للنصوص العربية، وPoppins للنصوص الإنجليزية والأرقام اللاتينية، وCairo للعناوين، وLalezar للشارات القصيرة فقط. لا تستخدم الخط المزخرف في الفقرات الطويلة.
+0. **قابلية القراءة:** حجم النص الأساسي بين 11 و12.5pt، العناوين بين 16 و24pt، line-height بين 1.6 و1.85، ومسافة واضحة بين السؤال والاختيارات ومفتاح الإجابة.
+0. **التنظيم الطباعي:** لا تضع أكثر من سؤالين متوسطين في صفحة واحدة إذا احتاج كل منهما شرحاً أو مساحة حل؛ امنع انقسام بطاقة السؤال أو جدولها بين صفحتين، واجعل الهوامش متوازنة والعناصر مصطفة على شبكة واحدة.
 1. **صفحة الغلاف:** شريط الشراكة + هيدر مع عنوان الكويز + الشعار + عدد الأسئلة والتعليمات
 2. **الجزء الأول — أسئلة الاختيار من متعدد (MCQs):** كل سؤال مرقم بوضوح مع 4 اختيارات في أربعة أسطر مستقلة بالترتيب (أ)، (ب)، (ج)، (د)، مع دوائر أو مربعات اختيار فارغة ☐. ممنوع دمج الاختيارات في سطر واحد أو فصلها بمسافات أفقية، ويجب أن تحتوي القيم على وحداتها.
 3. **الجزء الثاني — الأسئلة المقالية والتحليلية:** اذكر المعطيات والمطلوب والوحدات بوضوح، ثم أضف بعد كل سؤال مساحة بعنوان «مساحة خطتك وحلك باليد (فكر وحل هنا أولاً):» مع 3–5 أسطر مخصصة للحل.
@@ -405,7 +408,7 @@ ${customCss}
 📄 القواعد التقنية:
 - كل صفحة بحاوية: \`<div class="pg">\` ... \`</div>\` بأبعاد \`210mm x 296mm\`
 - \`break-after: page;\` لكل صفحة
-- الخطوط: Google Fonts (Cairo, Lalezar, Aref Ruqaa)
+- الخطوط: Google Fonts (Noto Sans Arabic, Tajawal, Cairo, Poppins, Lalezar, Aref Ruqaa)
 - اتجاه RTL
 
 المحتوى العلمي المرجعي لإنشاء الأسئلة:
@@ -472,7 +475,7 @@ export async function generateSelfGradingHtmlQuiz({
   <title>كويز تفاعلي ذاتي التصحيح — ${safeTitle}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Lalezar&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Lalezar&family=Noto+Sans+Arabic:wght@400;500;600;700;800&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
@@ -489,11 +492,11 @@ export async function generateSelfGradingHtmlQuiz({
       --wrong: #EF4444;
       --border-color: #E2E8F0;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Sans Arabic', 'Cairo', sans-serif; }
     body {
       background: var(--bg);
       color: var(--dark);
-      padding: 20px 10px;
+      padding: 28px 14px;
       min-height: 100vh;
       display: flex;
       justify-content: center;
@@ -505,7 +508,7 @@ export async function generateSelfGradingHtmlQuiz({
       background: var(--paper);
       border: 3.5px solid var(--primary);
       border-radius: 20px;
-      padding: 25px;
+      padding: 30px clamp(18px, 4vw, 42px);
       box-shadow: 0 15px 35px rgba(0,0,0,0.1);
       position: relative;
     }
@@ -518,7 +521,8 @@ export async function generateSelfGradingHtmlQuiz({
       align-items: center;
       justify-content: space-between;
       margin-bottom: 20px;
-      font-size: 0.85rem;
+      font-size: 0.86rem;
+      line-height: 1.65;
       border: 1.5px solid #FFE938;
     }
     .quiz-head {
@@ -540,8 +544,9 @@ export async function generateSelfGradingHtmlQuiz({
       margin-bottom: 10px;
     }
     .quiz-title {
-      font-size: 1.3rem;
+      font-size: clamp(1.2rem, 2.5vw, 1.55rem);
       font-weight: 800;
+      line-height: 1.55;
       color: var(--dark);
     }
     .quiz-meta-bar {
@@ -588,8 +593,8 @@ export async function generateSelfGradingHtmlQuiz({
       background: var(--card-bg);
       border: 2px solid var(--border-color);
       border-radius: 14px;
-      padding: 20px;
-      margin-bottom: 22px;
+      padding: 22px 24px;
+      margin-bottom: 24px;
       transition: all 0.25s ease;
       box-shadow: 0 4px 10px rgba(0,0,0,0.03);
     }
@@ -621,9 +626,9 @@ export async function generateSelfGradingHtmlQuiz({
       flex-shrink: 0;
     }
     .q-text {
-      font-size: 1.05rem;
+      font-size: 1.08rem;
       font-weight: 700;
-      line-height: 1.6;
+      line-height: 1.8;
       color: var(--dark);
     }
     .math, .katex { direction: ltr; unicode-bidi: embed; }
@@ -638,14 +643,15 @@ export async function generateSelfGradingHtmlQuiz({
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 12px 16px;
+      padding: 14px 16px;
       border: 1.5px solid var(--border-color);
       border-radius: 10px;
       cursor: pointer;
       transition: all 0.2s ease;
       background: #FFF;
-      font-size: 0.98rem;
+      font-size: 1rem;
       font-weight: 600;
+      line-height: 1.7;
     }
     .opt-label:hover {
       border-color: var(--primary);
@@ -679,8 +685,8 @@ export async function generateSelfGradingHtmlQuiz({
       border-radius: 10px;
       background: #FFF9E6;
       border-right: 4.5px solid var(--accent);
-      font-size: 0.92rem;
-      line-height: 1.6;
+      font-size: 0.94rem;
+      line-height: 1.75;
       display: none;
     }
     .learning-tag {
