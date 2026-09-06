@@ -7,7 +7,6 @@ import { fileURLToPath } from 'url';
 import { generateLessonHtml, createLessonPlan, modifyLessonHtml, extractLessonTitle } from './aiService.js';
 import { extractYoutubeTranscript, extractPdfText, getSourceQualityAdvisor } from './sourceExtractor.js';
 import { convertHtmlToPdf, renderHtmlDirectlyToPdf } from './pdfRenderer.js';
-import { isUserAllowed } from './adminControl.js';
 import { generateInteractiveQuiz, generateQuizPdf, generateSelfGradingHtmlQuiz } from './quizGenerator.js';
 import { processGeneratedHtml } from './fontsHelper.js';
 import { getApiKeyPool, hasValidApiKey, getPrimaryApiKey } from './apiKeyManager.js';
@@ -106,13 +105,10 @@ bot.use(async (ctx, next) => {
   await next();
 });
 
-// 🌐 البوت مفتوح للاستخدام العام؛ يحتفظ هذا الـ middleware بتسجيل تغييرات الجلسات.
+// 🌐 البوت مفتوح للاستخدام العام بدون قائمة مستخدمين أو حد لعدد المستخدمين.
 bot.use(async (ctx, next) => {
-  try {
-    await next();
-  } finally {
-    markSessionsDirty();
-  }
+  await next();
+  markSessionsDirty();
 });
 
 // 🎨 3. الهويات البصرية المتاحة
