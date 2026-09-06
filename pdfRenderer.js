@@ -120,7 +120,8 @@ export async function renderHtmlDirectlyToPdf(htmlString, isLandscape = false) {
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       });
 
-      await page.emulateMediaType('print');
+      // page.pdf() يفعّل print media تلقائياً؛ استدعاء emulateMediaType هنا
+      // يرسل CDP command إضافياً وقد يفشل إذا أغلق Chromium الـTarget تحت الضغط.
       const pdfBuffer = await page.pdf({
         format: 'A4',
         landscape: isLandscape,
@@ -159,8 +160,6 @@ export async function convertHtmlToPdf(htmlFilePath, outputPdfPath, isLandscape 
       waitUntil: 'load',
       timeout: 60000
     });
-
-    await page.emulateMediaType('print');
 
     await page.pdf({
       path: outputPdfPath,
