@@ -48,7 +48,7 @@ This Telegram bot is configured for Railway using Nixpacks. Set the variables in
 
 ## التشغيل الآمن والفحوصات
 
-- أصبح `REQUIRE_AUTH=true` هو الوضع الافتراضي. يجب ضبط `ALLOWED_USER_IDS` أو `ADMIN_IDS` قبل تشغيل البوت في الإنتاج.
+- البوت مفتوح للاستخدام العام؛ لم تعد `REQUIRE_AUTH` أو `ALLOWED_USER_IDS` أو `ADMIN_IDS` تمنع المستخدمين من الدخول.
 - يتم تعقيم HTML المرسل أو المرفوع قبل تمريره إلى Chromium، وتُحظر وسوم التنفيذ والخصائص الحدثية وقواعد CSS الخطرة.
 - تُحفظ جلسات المستخدمين في `SESSION_FILE` مع حفظ ذري مؤجل. على Railway يفضّل ربط المسار بـ Volume أو تخزين دائم.
 - يتطلب `/health` و`/ready` اكتمال اتصال Telegram ووجود مفتاح Gemini صالح حتى يعيدا حالة الجاهزية.

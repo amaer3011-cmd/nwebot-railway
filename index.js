@@ -106,12 +106,8 @@ bot.use(async (ctx, next) => {
   await next();
 });
 
-// 🔒 1. فحص الصلاحيات
+// 🌐 البوت مفتوح للاستخدام العام؛ يحتفظ هذا الـ middleware بتسجيل تغييرات الجلسات.
 bot.use(async (ctx, next) => {
-  if (!isUserAllowed(ctx)) {
-    await ctx.reply('⚠️ **عذراً، هذا البوت مخصص للمصرح لهم فقط.**\nيرجى التواصل مع الأدمن للحصول على صلاحية الاستخدام.', { parse_mode: 'Markdown' });
-    return;
-  }
   try {
     await next();
   } finally {
