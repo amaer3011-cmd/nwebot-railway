@@ -940,7 +940,7 @@ async function updateProgress(ctx, statusMsg, stage, percent, detail) {
   } catch (_) {}
 }
 
-// ⚡ 4. محرك المعالجة المباشر وإرسال ملف PDF واحد فقط مع خيارات التعديل
+// ⚡ 4. محرك المعالجة المباشر وإرسال ملف HTML شرح واحد فقط مع خيارات التعديل
 async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageMimeType, images = [], audioBuffer, audioMimeType, isEdit = false }) {
   if (!hasValidApiKey()) {
     await safeReply(ctx, `⚠️ **تنبيه:** لم يتم إدخال أي مفتاح صالح لـ \`GEMINI_API_KEY\` في ملف \`.env\`.`, { parse_mode: 'Markdown' });
@@ -952,7 +952,7 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
   const sourceLabel = totalImages > 1 ? `🖼️ (${totalImages} صور مجمعة ومترابطة)` : sourceType.toUpperCase();
 
   const statusText = isEdit
-    ? `✏️ **جاري تطبيق التعديلات المطلوبة وإعادة تجهيز ملف الـ PDF...**`
+    ? `✏️ **جاري تطبيق التعديلات المطلوبة وإعادة تجهيز ملف HTML الشرح...**`
     : `⚡ **جاري تجهيز الملزمة بجودة عالية...**\n• الهوية: ${session.identity}\n• المصدر: ${sourceLabel}`;
 
   let statusMsg = null;
@@ -1049,22 +1049,13 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
     };
     session.lessonHistory = [historyItem, ...session.lessonHistory.filter(l => l.title !== historyItem.title)].slice(0, 10);
 
-    const pdfDisplayFilename = isEdit
-      ? `المتفوق — ${lessonTitle} — معدل.pdf`
-      : `المتفوق — ${lessonTitle}.pdf`;
+    const htmlBuffer = Buffer.from(sanitizeDocumentHtml(htmlCode), 'utf8');
+    const htmlDisplayFilename = isEdit
+      ? `المتفوق — ${lessonTitle} — معدل.html`
+      : `المتفوق — ${lessonTitle}.html`;
+    await updateProgress(ctx, statusMsg, 'تجهيز ملف HTML الشرح', 90, 'جاري حفظ ملف HTML المكتفي ذاتياً وإعداده للإرسال.');
 
-    // ⚡ توليد سريع ومباشر للـ PDF في الذاكرة (In-Memory Buffer) دون الحاجة للقرص
-    await updateProgress(ctx, statusMsg, 'تحويل ومراجعة ملف PDF', 90, 'جاري تحويل الملف، والتأكد من جاهزيته قبل الإرسال.');
-    const isLandscape = session.identity.includes('Landscape') || session.identity.includes('الصفحتين');
-    const pdfBuffer = await renderSafePdf(htmlCode, isLandscape);
-
-    if (statusMsg) {
-      try {
-        await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
-      } catch (_) {}
-    }
-
-    // لوحة مفاتيح تفاعلية مرفقة تحت ملف الـ PDF الواحد
+    // لوحة مفاتيح تفاعلية مرفقة تحت ملف HTML الشرح
     const editKeyboard = new InlineKeyboard()
       .text('✏️ طلب تعديل على هذا الملف', 'request_edit_file')
       .row()
@@ -1076,13 +1067,13 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
       .text('💻 كود HTML الاحتياطي', 'get_backup_html')
       .text('🔙 القائمة الرئيسية', 'main_menu');
 
-    await updateProgress(ctx, statusMsg, 'اكتمل الملف', 100, 'تمت المراجعة والتحويل بنجاح، جاري إرسال الملف الآن.');
+    await updateProgress(ctx, statusMsg, 'اكتمل ملف HTML الشرح', 100, 'تمت المراجعة والتنسيق بنجاح، جاري إرسال ملف HTML فقط.');
     if (statusMsg) {
       try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
     }
-    // 📄 إرسال ملف PDF واحد فقط باسم محتواه
-    await ctx.replyWithDocument(new InputFile(pdfBuffer, pdfDisplayFilename), {
-      caption: `✨ **تم إعداد ملزمة «${lessonTitle.replace(/_/g, ' ')}» بنجاح!**\n\n🎨 **الهوية:** ${session.identity}\n⚡ **النظام:** البكالوريا المصرية 2027\n\n👇 يمكنك تعديل هذا الملف أو إنشاء كويز تفاعلي فوري من الأزرار أدناه:`,
+    // 🌐 إرسال ملف HTML الشرح فقط باسم محتواه
+    await ctx.replyWithDocument(new InputFile(htmlBuffer, htmlDisplayFilename), {
+      caption: `✨ **تم إعداد شرح HTML لدرس «${lessonTitle.replace(/_/g, ' ')}» بنجاح!**\n\n🎨 **الهوية:** ${session.identity}\n⚡ **النظام:** البكالوريا المصرية 2027\n🌐 **النتيجة:** ملف HTML شرح فقط — افتحه في أي متصفح.\n\n👇 يمكنك تعديل الملف أو إنشاء كويز تفاعلي من الأزرار أدناه:`,
       reply_markup: editKeyboard
     });
 

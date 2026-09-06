@@ -5,6 +5,18 @@ import { getApiKeyPool } from './apiKeyManager.js';
 
 const PLAN_MODELS = ['gemini-2.5-flash', 'gemini-3.6-flash'];
 
+function isQuotaError(error) {
+  const message = String(error?.message || error || '');
+  return error?.status === 429 || /429|quota|too many requests|rate limit/i.test(message);
+}
+
+function quotaError() {
+  const error = new Error('انتهت حصة Gemini الحالية. انتظر حتى تجدد الحصة أو استخدم مفتاحاً/خطة مدفوعة ثم أعد المحاولة.');
+  error.code = 'GEMINI_QUOTA_EXCEEDED';
+  error.status = 429;
+  return error;
+}
+
 export function extractLessonTitle(htmlCode, fallbackTitle = 'ملزمة جديدة') {
   try {
     const titleMatch = htmlCode.match(/<title>(.*?)<\/title>/i) ||
@@ -69,6 +81,7 @@ ${userPrompt || 'حلل الصور أو الصوت المرفقين فقط.'}
         const plan = result.response.text()?.trim();
         if (plan && plan.length > 80) return plan.slice(0, 16000);
       } catch (error) {
+        if (isQuotaError(error)) throw quotaError();
         lastError = error;
       }
     }
@@ -99,7 +112,7 @@ export async function generateLessonHtml({
 
   const systemInstruction = getSystemPrompt(selectedIdentity, isPartner, `${userPrompt || ''}
 ${lessonPlan || ''}`, track);
-      const modelsToTry = [modelName, 'gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest'];
+      const modelsToTry = [modelName, 'gemini-2.5-flash'];
   const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
   let lastError = null;
 
@@ -144,6 +157,7 @@ ${lessonPlan || ''}`, track);
               console.log(`🔎 تم تحليل ${inspected.pages.length} صورة/صفحة وإنشاء قائمة تغطية من ${inspected.coverageChecklist.length} موضوعاً.`);
             }
           } catch (inspectionError) {
+            if (isQuotaError(inspectionError)) throw quotaError();
             console.warn('⚠️ تعذر التحليل المنظم للصور، سيتم استخدام الصور مباشرة:', inspectionError.message);
           }
         }
@@ -208,6 +222,7 @@ ${lessonPlan || 'خطة مستخرجة داخلياً من المصدر فقط.'
           return processGeneratedHtml(responseText);
         }
       } catch (err) {
+        if (isQuotaError(err)) throw quotaError();
         console.warn(`فشلت المحاولة بالمفتاح [${keyIndex + 1}/${keyPool.length}]:`, err.message);
         lastError = err;
       }
@@ -228,7 +243,7 @@ export async function modifyLessonHtml({
 }) {
   const keyPool = getApiKeyPool(apiKey);
   const systemInstruction = getSystemPrompt(selectedIdentity, isPartner, editInstructions || existingHtml, track);
-  const modelsToTry = [modelName, 'gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.6-flash'];
+  const modelsToTry = [modelName, 'gemini-2.5-flash'];
   const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
   let lastError = null;
 
@@ -270,6 +285,7 @@ ${existingHtml}
           return processGeneratedHtml(responseText);
         }
       } catch (err) {
+        if (isQuotaError(err)) throw quotaError();
         lastError = err;
       }
     }

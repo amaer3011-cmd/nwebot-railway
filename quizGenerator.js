@@ -148,6 +148,11 @@ function getQuizApiKeyPool(apiKey) {
   return getApiKeyPool(apiKey);
 }
 
+function isQuotaError(error) {
+  const message = String(error?.message || error || '');
+  return error?.status === 429 || /429|quota|too many requests|rate limit/i.test(message);
+}
+
 /**
  * توليد كويز اختيار من متعدد (MCQ) لاستخدامه كـ Telegram Quiz Poll
  */
@@ -164,7 +169,7 @@ export async function generateInteractiveQuiz({
 
   const keyPool = getQuizApiKeyPool(apiKey);
   // نبدأ بالنماذج الأكثر استقراراً، ونترك النموذج المطلوب كخيار أخير.
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.6-flash', modelName];
+  const modelsToTry = [modelName, 'gemini-2.5-flash'];
   const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
   let lastError = null;
 
@@ -298,6 +303,7 @@ ${contentText.slice(0, 12000)}
           }));
         }
       } catch (err) {
+        if (isQuotaError(err)) throw new Error('انتهت حصة Gemini الحالية. انتظر حتى تجدد الحصة أو استخدم مفتاحاً/خطة مدفوعة ثم أعد المحاولة.');
         const message = String(err?.message || '');
         const statusMatch = message.match(/\b(429|503)\b/);
         const status = err?.status || (statusMatch ? Number(statusMatch[1]) : null);
@@ -334,7 +340,7 @@ export async function generateQuizPdf({
   if (!apiKey) throw new Error('مفتاح API غير متوفر');
 
   const keyPool = getQuizApiKeyPool(apiKey);
-  const modelsToTry = [modelName, 'gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.6-flash'];
+  const modelsToTry = [modelName, 'gemini-2.5-flash'];
   const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
   let lastError = null;
 
@@ -462,6 +468,7 @@ ${contentText.slice(0, 12000)}
           return processGeneratedHtml(validateGeneratedQuizHtml(responseText));
         }
       } catch (err) {
+        if (isQuotaError(err)) throw new Error('انتهت حصة Gemini الحالية. انتظر حتى تجدد الحصة أو استخدم مفتاحاً/خطة مدفوعة ثم أعد المحاولة.');
         console.warn(`فشلت محاولة كويز PDF بالمفتاح [${keyIndex + 1}/${keyPool.length}]:`, err.message);
         lastError = err;
       }
