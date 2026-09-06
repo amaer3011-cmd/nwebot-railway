@@ -83,6 +83,11 @@ export function processGeneratedHtml(htmlCode) {
   // كما نعالج \text{...} حتى لا تظهر ككلمة خام داخل ملف PDF.
   cleanHtml = cleanHtml.replace(/\$([^$\n]+)\$/g, (_, expression) => `\\(${expression}\\)`);
   cleanHtml = cleanHtml.replace(/\\text\{([^{}]+)\}/g, '\\mathrm{$1}');
+  cleanHtml = cleanHtml
+    .replace(/\bX{4,}\b/g, '')
+    .replace(/\[رمز\]/g, '')
+    // توحيد المسافة بين الرقم والوحدة دون المساس بالأرقام العشرية.
+    .replace(/(\d)\s+(m\/s(?:\^?2)?|m|s|kg|N|J|W|Hz|ثواني|ثانية|متر|سم|كجم)\b/gi, '$1 $2');
   // إزالة بادئات OCR الغريبة حول أوامر KaTeX مع الإبقاء على الأمر القياسي.
   cleanHtml = cleanHtml
     .replace(/\\lambda\s*(?:sqrt|\\sqrt)\s*/gi, '\\sqrt')
