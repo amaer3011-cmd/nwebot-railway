@@ -80,7 +80,9 @@ export function processGeneratedHtml(htmlCode) {
     .replace(/\b[vV]\s*\(\s*2\s*([a-zA-Z])\s*([a-zA-Z])\s*\)/g, '\\sqrt{2$1$2}')
     .replace(/\b[vV]\s*\(\s*([^()]+\^2\s*\+\s*[^()]+\^2)\s*\)/g, '\\sqrt{$1}')
     .replace(/t\s*=\s*[vV]\s*\(\s*2\s*([^()]+)\/\s*([^()]+)\s*\)/g, 't = \\sqrt{\\frac{2$1}{$2}}')
-    .replace(/\\sqrt\{\}\s*\(([^()]+)\)/g, '\\sqrt{$1}');
+    .replace(/\\sqrt\{\}\s*\(([^()]+)\)/g, '\\sqrt{$1}')
+    .replace(/u_f\s*=\s*\\sqrt\{\}\s*\\?\{([^()]+)\)/gi, 'u_f = \\sqrt{$1}')
+    .replace(/\bt\s*=\s*[vV]\s*\(\s*2d\s*\/\s*g\s*\)/gi, 't = \\sqrt{\\frac{2d}{g}}');
 
   // 3. تضمين الخطوط ومكتبة المعادلات KaTeX بالهيد إن لم تكن موجودة
   if (!cleanHtml.includes('fonts.googleapis.com') && cleanHtml.includes('<head>')) {
