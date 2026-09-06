@@ -627,7 +627,8 @@ bot.on('callback_query:data', async (ctx) => {
     const item = session.lessonHistory[idx];
     if (item) {
       await ctx.answerCallbackQuery({ text: '📄 جاري تجهيز ملزمة الـ PDF...' });
-      await processAndSendHtml(ctx, { prompt: item.contentText, sourceType: 'text' });
+      const historySource = extractTextFromHtml(item.html || '').trim() || item.contentText;
+      await processAndSendHtml(ctx, { prompt: historySource, sourceType: 'text' });
     }
 
   }
@@ -911,7 +912,7 @@ function extractTextFromHtml(html) {
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 6000);
+    .slice(0, 12000);
 }
 
 // ⚡ 4. محرك المعالجة المباشر وإرسال ملف PDF واحد فقط مع خيارات التعديل

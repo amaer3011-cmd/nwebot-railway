@@ -201,7 +201,7 @@ ${subjectInfo.generalPrinciples.map(p => `• ${p}`).join('\n')}
 ]
 
 المحتوى العلمي المرجعي الوحيد المسموح باستخدامه:
-${contentText.slice(0, 6000)}
+${contentText.slice(0, 12000)}
 `;
 
         const result = await model.generateContent(prompt);
@@ -381,7 +381,7 @@ ${customCss}
 - اتجاه RTL
 
 المحتوى العلمي المرجعي لإنشاء الأسئلة:
-${contentText.slice(0, 6000)}
+${contentText.slice(0, 12000)}
 `;
 
         const result = await model.generateContent(prompt);
