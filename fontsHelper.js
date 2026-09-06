@@ -46,6 +46,14 @@ export const PRINT_LAYOUT_OVERRIDES = `
   .formula-box .formula-title { font-weight: 800; color: #2B3445; margin-bottom: 2mm; }
   .formula-box + *, table + *, .katex-display + * { margin-top: 4mm !important; }
   table td, table th { padding: 2.5mm 3mm !important; vertical-align: middle; }
+  .workspace-area {
+    min-height: 28mm !important;
+    margin: 4mm 0 6mm !important;
+    padding: 3mm !important;
+    border: 1px dashed #94A3B8 !important;
+    background: repeating-linear-gradient(to bottom, transparent 0, transparent 8mm, #CBD5E1 8.2mm, transparent 8.5mm) !important;
+    break-inside: avoid !important;
+  }
 </style>
 `;
 
