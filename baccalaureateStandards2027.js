@@ -244,7 +244,24 @@ export function detectSubjectGuidelines(contentText = '', explicitTrack = null) 
     } else if (/(جغرافيا|حدود|مضيق|أحلاف|دولة|سياسة|نفس|اجتماع|فلسفة|منطق|فن|ترجمة|ديموغرافيا)/.test(text)) {
       trackKey = 'arts';
     } else {
-      trackKey = 'medical'; // افتراضي
+      // لا تفرض مساراً تخصصياً عند غياب دليل من المصدر؛ هذا كان سبب تسرب
+      // أمثلة طبية إلى ملازم اللغة والمواد العامة.
+      return {
+        subjectName: 'مادة الدرس كما وردت في المصدر',
+        trackId: 'source_only',
+        trackTitle: 'محتوى المصدر فقط',
+        guidelines: `
+- استخرج المادة والموضوع من المصدر نفسه فقط.
+- ممنوع افتراض مسار أو تخصص أو إدخال أمثلة من الطب أو الهندسة أو الأعمال أو الآداب دون ظهورها في المصدر.
+- استخدم أمثلة مطابقة للموضوع واللغة الظاهرة في المصدر، ولا تضف سياقاً خارجياً لمجرد تحسين الصياغة.
+`,
+        cognitiveDistribution: BACCALAUREATE_2027.examStructure.cognitiveDistribution,
+        generalPrinciples: [
+          'الالتزام الحرفي بالمصدر وعدم اختراع موضوعات أو أمثلة خارجية',
+          'تحديد المادة والموضوع من العناوين والمفردات الظاهرة فقط',
+          'توزيع الشرح والتدريبات وفق حجم المصدر الفعلي'
+        ]
+      };
     }
   }
 
@@ -275,5 +292,5 @@ export function getBaccalaureateTrackInfo(trackKey = 'auto', contentText = '') {
   if (detected.trackId && BACCALAUREATE_2027.tracks[detected.trackId]) {
     return BACCALAUREATE_2027.tracks[detected.trackId];
   }
-  return BACCALAUREATE_2027.tracks.medical;
+  return detectSubjectGuidelines(contentText, null);
 }

@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import http from 'http';
 import { fileURLToPath } from 'url';
-import { generateLessonHtml, modifyLessonHtml, extractLessonTitle } from './aiService.js';
+import { generateLessonHtml, createLessonPlan, modifyLessonHtml, extractLessonTitle } from './aiService.js';
 import { extractYoutubeTranscript, extractPdfText, getSourceQualityAdvisor } from './sourceExtractor.js';
 import { convertHtmlToPdf, renderHtmlDirectlyToPdf } from './pdfRenderer.js';
 import { isUserAllowed } from './adminControl.js';
@@ -949,7 +949,7 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
 
   const statusText = isEdit
     ? `✏️ **جاري تطبيق التعديلات المطلوبة وإعادة تجهيز ملف الـ PDF...**`
-    : `⚡ **جاري معالجة المحتوى وإعداد ملف الـ PDF باسم الدرس...**\n• المسار: ${getTrackBadge(session.track)}\n• الهوية: ${session.identity}\n• المصدر: ${sourceLabel}`;
+    : `⚡ **جاري تجهيز الملزمة بجودة عالية...**\n• الهوية: ${session.identity}\n• المصدر: ${sourceLabel}`;
 
   let statusMsg = null;
   try {
@@ -968,6 +968,7 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
   try {
     await updateProgress(ctx, statusMsg, 'استقبال وتجهيز المصدر', 10, 'تم استلام المحتوى، وجاري تجهيز النصوص والصور للمراجعة.');
     let htmlCode = '';
+    let lessonPlan = '';
     if (isEdit && session.lastHtml) {
       // تعديل ملف HTML موجود
       await updateProgress(ctx, statusMsg, 'تحليل التعديل والملف السابق', 25, 'جاري فهم المطلوب والمحافظة على المحتوى الصحيح.');
@@ -980,8 +981,22 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
         modelName: defaultModel
       });
     } else {
-      // توليد ملف HTML جديد
-      await updateProgress(ctx, statusMsg, 'تحليل الصور والمحتوى', 25, 'جاري قراءة الصور واستخراج العناوين والقوانين والأمثلة.');
+      // تخطيط مستقل قبل توليد أي HTML لتحديد المادة وتوزيع الصفحات من المصدر فقط.
+      await updateProgress(ctx, statusMsg, 'بناء مخطط الملزمة', 25, 'جاري تحديد المادة والعناوين وترتيب المفاهيم وتوزيع الصفحات قبل الكتابة.');
+      lessonPlan = await createLessonPlan({
+        apiKey: geminiApiKey,
+        userPrompt: prompt,
+        modelName: defaultModel,
+        sourceType,
+        imageBuffer,
+        imageMimeType,
+        images,
+        audioBuffer,
+        audioMimeType
+      });
+      await updateProgress(ctx, statusMsg, 'مراجعة المخطط', 38, 'تم إعداد مخطط المصدر؛ جاري التحقق من عدم إدخال موضوعات خارجية.');
+      // توليد ملف HTML جديد بعد اعتماد المخطط
+      await updateProgress(ctx, statusMsg, 'كتابة الملزمة وتوزيع الصفحات', 48, 'جاري صياغة الشرح والأمثلة والتمارين وفق المخطط المعتمد.');
       htmlCode = await generateLessonHtml({
         apiKey: geminiApiKey,
         userPrompt: prompt,
@@ -994,7 +1009,8 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
         images: images,
         audioBuffer: audioBuffer,
         audioMimeType: audioMimeType,
-        track: session.track || 'auto'
+        track: session.track || 'auto',
+        lessonPlan
       });
     }
 
@@ -1003,7 +1019,7 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
     if (!quality.ok) {
       throw new Error(`فشلت مراجعة الملزمة قبل التحويل: ${quality.problems.join('، ')}`);
     }
-    await updateProgress(ctx, statusMsg, 'مراجعة الملزمة', 75, `تم فحص HTML والمعادلات والصفحات — ${quality.textLength} حرفاً علمياً صالحاً.`);
+    await updateProgress(ctx, statusMsg, 'مراجعة الملزمة', 78, `تم فحص HTML والمعادلات والصفحات — ${quality.textLength} حرفاً علمياً صالحاً.`);
 
     // استخراج اسم الدرس ديناميكياً لتسمية الملف باسم محتواه
     const lessonTitle = extractLessonTitle(htmlCode, 'ملزمة_المتفوق');
@@ -1057,9 +1073,12 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
       .text('🔙 القائمة الرئيسية', 'main_menu');
 
     await updateProgress(ctx, statusMsg, 'اكتمل الملف', 100, 'تمت المراجعة والتحويل بنجاح، جاري إرسال الملف الآن.');
+    if (statusMsg) {
+      try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
+    }
     // 📄 إرسال ملف PDF واحد فقط باسم محتواه
     await ctx.replyWithDocument(new InputFile(pdfBuffer, pdfDisplayFilename), {
-      caption: `✨ **تم إعداد ملزمة «${lessonTitle.replace(/_/g, ' ')}» بنجاح!**\n\n🎯 **المسار:** ${getTrackBadge(session.track)}\n🎨 **الهوية:** ${session.identity}\n⚡ **النظام:** البكالوريا المصرية 2027\n\n👇 يمكنك تعديل هذا الملف أو إنشاء كويز تفاعلي فوري من الأزرار أدناه:`,
+      caption: `✨ **تم إعداد ملزمة «${lessonTitle.replace(/_/g, ' ')}» بنجاح!**\n\n🎨 **الهوية:** ${session.identity}\n⚡ **النظام:** البكالوريا المصرية 2027\n\n👇 يمكنك تعديل هذا الملف أو إنشاء كويز تفاعلي فوري من الأزرار أدناه:`,
       reply_markup: editKeyboard
     });
 

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { sanitizeDocumentHtml, publicErrorMessage } from '../htmlSecurity.js';
 import { getApiKeyPool } from '../apiKeyManager.js';
 import { extractLessonTitle } from '../aiService.js';
+import { detectSubjectGuidelines } from '../baccalaureateStandards2027.js';
 
 process.env.GEMINI_API_KEYS = 'first-key, second-key, first-key';
 process.env.GEMINI_API_KEY = 'third-key';
@@ -25,4 +26,17 @@ test('getApiKeyPool deduplicates configured keys', () => {
 
 test('extractLessonTitle creates a safe filename title', () => {
   assert.equal(extractLessonTitle('<html><head><title>المتفوق: الحركة/السرعة</title></head></html>'), 'الحركة_السرعة');
+});
+
+
+test('unknown content does not default to a medical track', () => {
+  const detected = detectSubjectGuidelines('موضوع عام غير محدد من المصدر فقط');
+  assert.equal(/طب|medical/i.test(detected.subjectName), false);
+  assert.equal(detected.trackId, 'source_only');
+});
+
+test('English lesson detection remains a core subject', () => {
+  const detected = detectSubjectGuidelines('English grammar: hedging language and modal verbs');
+  assert.equal(detected.trackId, 'core_english');
+  assert.equal(/طب|medical/i.test(detected.subjectName), false);
 });

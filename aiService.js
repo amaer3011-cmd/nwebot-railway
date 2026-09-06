@@ -3,6 +3,8 @@ import { getSystemPrompt } from './systemPrompt.js';
 import { processGeneratedHtml } from './fontsHelper.js';
 import { getApiKeyPool } from './apiKeyManager.js';
 
+const PLAN_MODELS = ['gemini-2.5-flash', 'gemini-3.6-flash'];
+
 export function extractLessonTitle(htmlCode, fallbackTitle = 'ملزمة جديدة') {
   try {
     const titleMatch = htmlCode.match(/<title>(.*?)<\/title>/i) ||
@@ -20,6 +22,60 @@ export function extractLessonTitle(htmlCode, fallbackTitle = 'ملزمة جدي�
   return fallbackTitle.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_');
 }
 
+/**
+ * يقرأ المصدر أولاً ويعيد مخططاً مختصراً قبل بدء كتابة الملزمة.
+ * المخطط لا يتحول إلى محتوى مستقل؛ بل يستخدم لتوجيه التوزيع ومنع خلط المواد.
+ */
+export async function createLessonPlan({
+  apiKey,
+  userPrompt = '',
+  modelName = 'gemini-2.5-flash',
+  imageBuffer = null,
+  imageMimeType = 'image/jpeg',
+  images = [],
+  audioBuffer = null,
+  audioMimeType = 'audio/ogg',
+  sourceType = 'text'
+}) {
+  const keyPool = getApiKeyPool(apiKey);
+  if (!keyPool.length) throw new Error('مفتاح GEMINI_API_KEY غير متوفر.');
+  const parts = [{ text: `
+أنت محلل محتوى تعليمي. حلل المصدر المرفق قبل الكتابة وأعد مخططاً داخلياً دقيقاً باللغة العربية.
+لا تكتب HTML ولا تشرح خارج المخطط. لا تفترض مساراً دراسياً، ولا تستخدم أمثلة طبية أو هندسية أو اقتصادية أو أدبية إلا إذا ظهرت فعلاً في المصدر.
+إذا كان المصدر لغة إنجليزية فحدد موضوع اللغة ومهاراتها فقط.
+أخرج بالترتيب:
+1) المادة والموضوع كما يظهران في المصدر.
+2) العناوين والمفاهيم بالترتيب.
+3) الأمثلة/النصوص/القواعد التي يجب الحفاظ عليها.
+4) توزيع مقترح من 2 إلى 10 صفحات مع وظيفة كل صفحة.
+5) قائمة تحقق للدقة وما يجب عدم إضافته.
+المصدر النصي أو الوصفي:
+${userPrompt || 'حلل الصور أو الصوت المرفقين فقط.'}
+` }];
+  for (const item of images || []) {
+    if (item.buffer) parts.push({ inlineData: { data: item.buffer.toString('base64'), mimeType: item.mimeType || 'image/jpeg' } });
+  }
+  if (imageBuffer) parts.push({ inlineData: { data: imageBuffer.toString('base64'), mimeType: imageMimeType } });
+  if (audioBuffer) parts.push({ inlineData: { data: audioBuffer.toString('base64'), mimeType: audioMimeType } });
+  let lastError = null;
+  for (const key of keyPool) {
+    for (const modelNameToTry of [...new Set([modelName, ...PLAN_MODELS])]) {
+      try {
+        const model = new GoogleGenerativeAI(key).getGenerativeModel({
+          model: modelNameToTry,
+          generationConfig: { temperature: 0.05, maxOutputTokens: 5000 }
+        });
+        const result = await model.generateContent(parts);
+        const plan = result.response.text()?.trim();
+        if (plan && plan.length > 80) return plan.slice(0, 16000);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+  }
+  throw new Error(`تعذر إعداد مخطط الملزمة: ${lastError?.message || 'خطأ غير معروف'}`);
+}
+
 export async function generateLessonHtml({
   apiKey,
   userPrompt,
@@ -32,7 +88,8 @@ export async function generateLessonHtml({
   audioBuffer = null,
   audioMimeType = 'audio/ogg',
   sourceType = 'text',
-  track = 'auto'
+  track = 'auto',
+  lessonPlan = ''
 }) {
   const keyPool = getApiKeyPool(apiKey);
 
@@ -40,7 +97,8 @@ export async function generateLessonHtml({
     throw new Error('مفتاح GEMINI_API_KEY غير متوفر في ملف .env أو في إعدادات الخدمة.');
   }
 
-  const systemInstruction = getSystemPrompt(selectedIdentity, isPartner, userPrompt, track);
+  const systemInstruction = getSystemPrompt(selectedIdentity, isPartner, `${userPrompt || ''}
+${lessonPlan || ''}`, track);
       const modelsToTry = [modelName, 'gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest'];
   const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
   let lastError = null;
@@ -109,13 +167,18 @@ export async function generateLessonHtml({
         const promptText = `
 ${sourceTypeInstruction}
 المطلوب: إنشاء ملزمة / مراجعة A4 بصيغة HTML كاملة ومكتفية بذاتها وفقاً لقواعد «المتفوق» للبكالوريا المصرية 2027، مقسمة على عدد الصفحات المناسب بحسب طول المحتوى (من 2 إلى 10 صفحات A4).
-⏳ **مرحلة الدقة قبل الإخراج:** لا تبدأ كتابة HTML مباشرة. أولاً افحص كل الصور/النصوص، وأنشئ داخلياً جرداً لكل عنوان وقانون ومثال ونظرية ورمز ظاهر، ثم طابق الجرد مع الأقسام الناتجة. يجب ألا يسقط أي موضوع، وخاصة الجبر والأعداد المركبة وذات الحدين والهندسة والدوائر عند ظهورها في المصدر.
+⏳ **مرحلة الدقة قبل الإخراج:** لا تبدأ كتابة HTML مباشرة. أولاً افحص كل الصور/النصوص، وأنشئ داخلياً جرداً لكل عنوان وقانون ومثال ونظرية ورمز ظاهر، ثم طابق الجرد مع الأقسام الناتجة.
+🧩 **المخطط المعتمد قبل الكتابة:**
+${lessonPlan || 'أنشئ مخططاً داخلياً من المصدر قبل كتابة الصفحات، ولا تضف أي قسم غير مؤيد بالمصدر.'} يجب ألا يسقط أي موضوع، وخاصة الجبر والأعداد المركبة وذات الحدين والهندسة والدوائر عند ظهورها في المصدر.
 🔍 **مراجعة نهائية إلزامية:** قبل إخراج HTML راجع الأرقام والرموز العربية والـLaTeX، واحذف أي رمز غريب أو placeholder، وتأكد أن كل قسم من المصدر ظهر في الملزمة مرة واحدة على الأقل دون اختراع موضوع خارج المصدر. لا تعرض جردك الداخلي؛ أخرج HTML فقط.
 
 ${visualDossier ? `📚 تقرير التحليل البصري الموثق — استخدمه كخريطة تغطية ولا تخالف النص الظاهر في الصور:\n${visualDossier}` : ''}
 
 المحتوى النصي أو التوضيحي المرفق:
 ${userPrompt || 'قم بتحليل وقراءة واستخراج كافة التفاصيل والشروحات والمعادلات من الصور والمحتوى المرفق ودمجها في ملزمة واحدة متكاملة.'}
+
+خطة التوزيع التي يجب تنفيذها دون اختراع محتوى:
+${lessonPlan || 'خطة مستخرجة داخلياً من المصدر فقط.'}
 `;
 
         contentParts.push(promptText);
