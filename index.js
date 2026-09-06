@@ -1405,7 +1405,7 @@ bot.on('message:document', async (ctx) => {
         return;
       }
 
-      // معالجة الـ HTML وتجهيزه وتصدير الـ PDF في الذاكرة مباشرة
+      // معالجة الـ HTML وتجهيزه وإعادته كملف شرح HTML فقط
       await updateProgress(ctx, statusMsg, 'تنظيف وتجهيز HTML', 60, 'جاري تعقيم المحتوى وحفظه في مكتبة الدروس.');
       const processedHtml = processGeneratedHtml(sanitizeDocumentHtml(rawHtml));
       const lessonTitle = extractLessonTitle(processedHtml, doc.file_name.replace(/\.(html|htm)$/i, ''));
@@ -1426,20 +1426,20 @@ bot.on('message:document', async (ctx) => {
       });
       if (session.lessonHistory.length > 10) session.lessonHistory.pop();
 
-      const pdfFilename = `${lessonTitle}.pdf`;
-      const isLandscape = session.identity.includes('Landscape') || session.identity.includes('الصفحتين');
-      await updateProgress(ctx, statusMsg, 'تحويل HTML إلى PDF', 85, 'جاري تجهيز ملف PDF النهائي وإرساله لك.');
-      const pdfBuffer = await renderSafePdf(processedHtml, isLandscape);
+      const htmlFilename = `${lessonTitle}.html`;
+      const htmlBuffer = Buffer.from(processedHtml, 'utf8');
+      await updateProgress(ctx, statusMsg, 'تجهيز ملف HTML الشرح', 85, 'جاري حفظ ملف الشرح HTML وإرساله لك.');
 
-      await updateProgress(ctx, statusMsg, 'اكتمل تجهيز ملف HTML', 100, 'تمت القراءة والتنظيف والتحويل بنجاح.');
+      await updateProgress(ctx, statusMsg, 'اكتمل تجهيز ملف HTML', 100, 'تمت القراءة والتنظيف والتنسيق بنجاح.');
       try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
-      await ctx.replyWithDocument(new InputFile(pdfBuffer, pdfFilename), {
+      await ctx.replyWithDocument(new InputFile(htmlBuffer, htmlFilename), {
         caption: `
-🌐 **تم قراءة واستيراد ملف الـ HTML بنجاح!** 📄
+🌐 **تم قراءة واستيراد ملف الـ HTML الشرح بنجاح!** 📄
 
 📌 **الملف:** ${lessonTitle.replace(/_/g, ' ')}
 🧭 **المسار:** ${getTrackBadge(session.track)}
 🎨 **الهوية:** ${session.identity}
+🌐 **النتيجة:** ملف HTML شرح فقط — افتحه في أي متصفح.
 
 💡 **خيارات الملف المتاحة:**
 • أرسل أي تعديل تريده في الشات وسيطبقه البوت فوراً على هذا الـ HTML.
