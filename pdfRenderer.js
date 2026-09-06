@@ -68,7 +68,6 @@ async function getBrowser() {
         '--disable-gpu',
         '--no-first-run',
         '--no-zygote',
-        '--single-process',
         '--font-render-hinting=none',
         '--disable-background-networking',
         '--disable-default-apps',
@@ -97,54 +96,52 @@ async function getBrowser() {
  * ⚡ تحويل مباشر من كود HTML إلى PDF Buffer في الذاكرة بسرعة فائقة دون الحاجة للقرص
  */
 export async function renderHtmlDirectlyToPdf(htmlString, isLandscape = false) {
-  let page = null;
-  try {
-    const browser = await getBrowser();
-    page = await browser.newPage();
+  let lastError = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    let page = null;
+    try {
+      const browser = await getBrowser();
+      page = await browser.newPage();
+      page.setDefaultTimeout(45000);
 
-    await page.setContent(htmlString, {
-      waitUntil: 'load',
-      timeout: 45000
-    });
+      await page.setContent(htmlString, { waitUntil: 'domcontentloaded', timeout: 45000 });
 
-    await page.evaluate(async () => {
-      if (document.fonts?.ready) await document.fonts.ready;
-      if (window.renderMathInElement) {
-        window.renderMathInElement(document.body, {
-          delimiters: [
-            { left: '\\[', right: '\\]', display: true },
-            { left: '\\(', right: '\\)', display: false }
-          ],
-          throwOnError: false
-        });
-      }
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    });
+      await page.evaluate(async () => {
+        if (document.fonts?.ready) await document.fonts.ready;
+        if (window.renderMathInElement) {
+          window.renderMathInElement(document.body, {
+            delimiters: [
+              { left: '\\[', right: '\\]', display: true },
+              { left: '\\(', right: '\\)', display: false }
+            ],
+            throwOnError: false
+          });
+        }
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      });
 
-    await page.emulateMediaType('print');
-
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      landscape: isLandscape,
-      printBackground: true,
-      margin: {
-        top: '0mm',
-        right: '0mm',
-        bottom: '0mm',
-        left: '0mm'
-      },
-      preferCSSPageSize: true
-    });
-
-    return Buffer.from(pdfBuffer);
-  } catch (err) {
-    console.error('خطأ تحويل PDF في الذاكرة:', err);
-    throw new Error(`تعذر تحويل الـ HTML إلى PDF: ${err.message}`);
-  } finally {
-    if (page) {
-      await page.close().catch(() => {});
+      await page.emulateMediaType('print');
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        landscape: isLandscape,
+        printBackground: true,
+        margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
+        preferCSSPageSize: true
+      });
+      return Buffer.from(pdfBuffer);
+    } catch (err) {
+      lastError = err;
+      const message = String(err?.message || '');
+      const targetClosed = /Target closed|Session closed|browser has disconnected|Connection closed/i.test(message);
+      console.error(`خطأ تحويل PDF (المحاولة ${attempt}/2):`, message);
+      if (!targetClosed || attempt === 2) break;
+      try { await sharedBrowser?.close(); } catch (_) {}
+      sharedBrowser = null;
+    } finally {
+      if (page) await page.close().catch(() => {});
     }
   }
+  throw new Error(`تعذر تحويل الـ HTML إلى PDF: ${lastError?.message || 'خطأ غير معروف'}`);
 }
 
 /**
