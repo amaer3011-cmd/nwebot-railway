@@ -68,6 +68,19 @@ function matchesSourceConcepts(item, sourceText) {
   return new Set(overlap).size >= Math.min(2, keywords.length);
 }
 
+function hasCognitiveQuality(items, count) {
+  const levels = items.map(item => String(item?.cognitiveLevel || '').toLowerCase());
+  const higher = levels.filter(level => level === 'analysis' || level === 'inference').length;
+  const application = levels.filter(level => level === 'application').length;
+  const outcomes = new Set(items.map(item => normalizeEvidenceText(item?.learningOutcome)).filter(Boolean));
+  const questions = items.map(item => normalizeEvidenceText(item?.question));
+  return levels.every(level => ['understanding', 'application', 'analysis', 'inference'].includes(level)) &&
+    higher >= Math.ceil(count * 0.4) &&
+    application >= Math.max(1, Math.floor(count * 0.2)) &&
+    outcomes.size >= Math.min(3, count) &&
+    new Set(questions).size === questions.length;
+}
+
 /**
  * مولّد الكويزات الاحترافي لبوت «المتفوق»
  * يدعم:
@@ -142,6 +155,12 @@ export async function generateInteractiveQuiz({
 
 مستوى الصعوبة والتوزيع: ${difficultyMap[difficulty] || difficultyMap.mixed}
 
+🧠 **التوزيع المعرفي الإلزامي (لا تقبل أسئلة حفظ سطحية فقط):**
+- 20% فهم المفهوم: تفسير معنى أو تمييز علاقة من النص.
+- 40% تطبيق: تعويض أو اختيار القانون المناسب في موقف جديد.
+- 40% تحليل واستنتاج: مقارنة حالتين، اكتشاف نتيجة، تفسير سبب، أو استنتاج علاقة غير مكتوبة حرفياً مع الاعتماد على المصدر.
+- يجب أن تتنوع نواتج التعلم، وألا تتكرر الفكرة أو طريقة الحل، وأن تتضمن المشتتات أخطاء مفاهيمية معقولة لا إجابات عشوائية.
+
 🎓 مواصفات ومعايير أسئلة البكالوريا 2027 التخصصية لمادة (${subjectInfo.subjectName}):
 ${subjectInfo.guidelines}
 
@@ -196,6 +215,8 @@ ${subjectInfo.generalPrinciples.map(p => `• ${p}`).join('\n')}
     "explanation": "شرح موجز ودقيق لسبب صحة هذا الخيار وناتج التعلم المستهدف",
     "learningOutcome": "ناتج التعلم المستهدف (مثل: استنتاج علاقة / تطبيق قانون عكسي / تحليل دلالة)",
     "sourceEvidence": "اقتباس حرفي قصير من النص المرجعي",
+    "cognitiveLevel": "understanding|application|analysis|inference",
+    "questionType": "concept|calculation|comparison|prediction|diagnosis",
     "difficulty": "easy|medium|hard"
   }
 ]
@@ -222,6 +243,9 @@ ${contentText.slice(0, 12000)}
           if (validItems.length < count) {
             throw new Error('النموذج أرجع أسئلة خارج الموضوع أو بدون اقتباس مصدر حرفي صالح');
           }
+          if (!hasCognitiveQuality(validItems.slice(0, count), count)) {
+            throw new Error('النموذج أرجع كويزاً سطحياً أو مكرراً ولا يحقق توزيع الفهم والتطبيق والتحليل');
+          }
 
           return validItems.slice(0, count).map(item => ({
             ...normalizeQuizItem(item),
@@ -231,6 +255,8 @@ ${contentText.slice(0, 12000)}
             explanation: item.explanation ? normalizeMathNotation(String(item.explanation)).trim().slice(0, 400) : 'الإجابة مستندة إلى القاعدة أو المثال الوارد في الدرس.',
             learningOutcome: item.learningOutcome ? String(item.learningOutcome).trim().slice(0, 140) : 'تطبيق ناتج تعلم من الدرس المصدر',
             sourceEvidence: String(item.sourceEvidence || '').trim().slice(0, 220),
+            cognitiveLevel: ['understanding', 'application', 'analysis', 'inference'].includes(String(item.cognitiveLevel).toLowerCase()) ? String(item.cognitiveLevel).toLowerCase() : 'application',
+            questionType: String(item.questionType || 'concept').trim().slice(0, 40),
             difficulty: ['easy', 'medium', 'hard'].includes(item.difficulty) ? item.difficulty : 'mixed'
           }));
         }
@@ -324,6 +350,8 @@ ${subjectInfo.guidelines}
 • ${subjectInfo.cognitiveDistribution.understanding}
 • ${subjectInfo.cognitiveDistribution.application}
 • ${subjectInfo.cognitiveDistribution.higherThinking}
+
+🧠 **جودة الأسئلة إلزامية:** لا تجعل الكويز حفظاً مباشراً فقط. وزّع الأسئلة بين فهم المفهوم، التطبيق، والتحليل والاستنتاج؛ اجعل 40% على الأقل تطبيقاً أو تحليلاً، و40% على الأقل تحليلاً أو استنتاجاً، مع ناتج تعلم مختلف لكل سؤال ومشتتات مفاهيمية معقولة.
 
 استخدم نظام الـ CSS التالي داخل وسم <style>:
 \`\`\`css
