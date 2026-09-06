@@ -74,7 +74,8 @@ async function getBrowser() {
         '--disable-sync',
         '--disable-extensions',
         '--disable-web-security',
-        '--memory-pressure-off'
+        '--renderer-process-limit=2',
+        '--disable-features=Translate,BackForwardCache'
       ]
     };
 
@@ -97,14 +98,14 @@ async function getBrowser() {
  */
 export async function renderHtmlDirectlyToPdf(htmlString, isLandscape = false) {
   let lastError = null;
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
     let page = null;
     try {
       const browser = await getBrowser();
       page = await browser.newPage();
-      page.setDefaultTimeout(45000);
+      page.setDefaultTimeout(60000);
 
-      await page.setContent(htmlString, { waitUntil: 'domcontentloaded', timeout: 45000 });
+      await page.setContent(htmlString, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
       await page.evaluate(async () => {
         if (document.fonts?.ready) await document.fonts.ready;
@@ -134,10 +135,11 @@ export async function renderHtmlDirectlyToPdf(htmlString, isLandscape = false) {
       lastError = err;
       const message = String(err?.message || '');
       const targetClosed = /Target closed|Session closed|browser has disconnected|Connection closed/i.test(message);
-      console.error(`خطأ تحويل PDF (المحاولة ${attempt}/2):`, message);
-      if (!targetClosed || attempt === 2) break;
+      console.error(`خطأ تحويل PDF (المحاولة ${attempt}/3):`, message);
+      if (!targetClosed || attempt === 3) break;
       try { await sharedBrowser?.close(); } catch (_) {}
       sharedBrowser = null;
+      await new Promise(resolve => setTimeout(resolve, 750));
     } finally {
       if (page) await page.close().catch(() => {});
     }
