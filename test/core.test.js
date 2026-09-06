@@ -4,6 +4,7 @@ import { sanitizeDocumentHtml, publicErrorMessage } from '../htmlSecurity.js';
 import { getApiKeyPool } from '../apiKeyManager.js';
 import { extractLessonTitle } from '../aiService.js';
 import { detectSubjectGuidelines } from '../baccalaureateStandards2027.js';
+import { createUnansweredQuizHtml } from '../quizGenerator.js';
 
 process.env.GEMINI_API_KEYS = 'first-key, second-key, first-key';
 process.env.GEMINI_API_KEY = 'third-key';
@@ -39,4 +40,12 @@ test('English lesson detection remains a core subject', () => {
   const detected = detectSubjectGuidelines('English grammar: hedging language and modal verbs');
   assert.equal(detected.trackId, 'core_english');
   assert.equal(/طب|medical/i.test(detected.subjectName), false);
+});
+
+test('unanswered essay quiz removes answer key and keeps printable questions', () => {
+  const html = '<html><head></head><body><div class="question-card">سؤال مقالي</div><section class="answer-key answer-key-section"><strong>الإجابة النموذجية</strong></section></body></html>';
+  const output = createUnansweredQuizHtml(html);
+  assert.match(output, /سؤال مقالي/);
+  assert.doesNotMatch(output, /الإجابة النموذجية/);
+  assert.match(output, /display: none/);
 });

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 import { generateLessonHtml, createLessonPlan, modifyLessonHtml, extractLessonTitle } from './aiService.js';
 import { extractYoutubeTranscript, extractPdfText, getSourceQualityAdvisor } from './sourceExtractor.js';
 import { convertHtmlToPdf, renderHtmlDirectlyToPdf } from './pdfRenderer.js';
-import { generateInteractiveQuiz, generateQuizPdf, generateSelfGradingHtmlQuiz } from './quizGenerator.js';
+import { generateInteractiveQuiz, generateQuizPdf, generateSelfGradingHtmlQuiz, createUnansweredQuizHtml } from './quizGenerator.js';
 import { processGeneratedHtml } from './fontsHelper.js';
 import { getApiKeyPool, hasValidApiKey, getPrimaryApiKey } from './apiKeyManager.js';
 import { getUserSession, markSessionsDirty, flushSessions } from './sessionStore.js';
@@ -636,16 +636,17 @@ async function handleQuizHtml(ctx, session, customContentText = null, customTitl
     return;
   }
 
-  const statusMsg = await ctx.reply(`🌐 **جاري إنشاء كويز تفاعلي ذاتي التصحيح (HTML) بمعايير البكالوريا 2027...**\n• المسار: ${getTrackBadge(session.track)}\n• عدد الأسئلة: ${session.quizSettings.count}\n• الصعوبة: ${getDifficultyName(session.quizSettings.difficulty)}`, { parse_mode: 'Markdown' });
+  const htmlQuizCount = 10;
+  const statusMsg = await ctx.reply(`🌐 **جاري إنشاء كويز تفاعلي ذاتي التصحيح (HTML) بمعايير البكالوريا 2027...**\n• عدد الأسئلة: ${htmlQuizCount}\n• النوع: اختيار من متعدد مع تصحيح فوري\n• الصعوبة: ${getDifficultyName(session.quizSettings.difficulty)}`, { parse_mode: 'Markdown' });
 
   try {
     const htmlCode = await generateSelfGradingHtmlQuiz({
       apiKey: geminiApiKey,
       contentText: contentText,
       modelName: defaultModel,
-      count: session.quizSettings.count,
+      count: htmlQuizCount,
       difficulty: session.quizSettings.difficulty,
-      quizType: session.quizSettings.type,
+      quizType: 'mcq',
       lessonTitle: title.replace(/_/g, ' '),
       isPartner: session.isPartner,
       explicitTrack: session.track || 'auto'
@@ -666,7 +667,7 @@ async function handleQuizHtml(ctx, session, customContentText = null, customTitl
 
 📌 **الدرس:** ${title.replace(/_/g, ' ')}
 🧭 **المسار:** ${getTrackBadge(session.track)}
-🔢 **عدد الأسئلة:** ${session.quizSettings.count} سؤال
+🔢 **عدد الأسئلة:** ${htmlQuizCount} سؤال اختيار من متعدد
 📊 **المستوى:** ${getDifficultyName(session.quizSettings.difficulty)}
 🎓 **المعايير:** البكالوريا المصرية 2027 (تحليل، استنتاج، فكرة وعكسها)
 
@@ -803,52 +804,54 @@ async function handleQuizPdf(ctx, session, customContentText = null, customTitle
     return;
   }
 
-  const statusMsg = await ctx.reply(`📋 **جاري تصميم كويز PDF احترافي بمعايير «المتفوق»...**\n• المسار: ${getTrackBadge(session.track)}\n• عدد الأسئلة: ${session.quizSettings.count}\n• الصعوبة: ${getDifficultyName(session.quizSettings.difficulty)}`, { parse_mode: 'Markdown' });
+  const essayCount = 5;
+  const statusMsg = await ctx.reply(`📋 **جاري إعداد نسختي كويز PDF مقالي (5 أسئلة)...**
+• نسخة مجابة بإجابات نموذجية
+• نسخة غير مجابة لمساحة الطالب
+• الصعوبة: ${getDifficultyName(session.quizSettings.difficulty)}`, { parse_mode: 'Markdown' });
 
   try {
-    let quizHtml = await generateQuizPdf({
+    let answeredHtml = await generateQuizPdf({
       apiKey: geminiApiKey,
-      contentText: contentText,
+      contentText,
       modelName: defaultModel,
-      count: session.quizSettings.count,
+      count: essayCount,
       selectedIdentity: session.identity,
       isPartner: session.isPartner,
       difficulty: session.quizSettings.difficulty,
       lessonTitle: title,
-      explicitTrack: session.track || 'auto'
+      explicitTrack: session.track || 'auto',
+      questionMode: 'essay'
     });
 
-    quizHtml = processGeneratedHtml(quizHtml);
-
-    const quizTitle = `كويز_المتفوق_${title.replace(/[\\/:*?"<>|]/g, '')}`;
-    const pdfFilename = `${quizTitle}.pdf`;
-
-    // ⚡ توليد سريع ومباشر للـ PDF في الذاكرة
+    answeredHtml = processGeneratedHtml(answeredHtml);
+    const unansweredHtml = processGeneratedHtml(createUnansweredQuizHtml(answeredHtml));
+    const quizTitle = `كويز_المتفوق_مقالي_${title.replace(/[\/:*?"<>|]/g, '')}`;
     const isLandscape = session.identity.includes('Landscape') || session.identity.includes('الصفحتين');
-    const pdfBuffer = await renderSafePdf(quizHtml, isLandscape);
+    const answeredBuffer = await renderSafePdf(answeredHtml, isLandscape);
+    const unansweredBuffer = await renderSafePdf(unansweredHtml, isLandscape);
 
     try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
 
-    await ctx.replyWithDocument(new InputFile(pdfBuffer, pdfFilename), {
-      caption: `
-📋 **كويز «المتفوق» جاهز ومباشر للطباعة!**
+    await ctx.replyWithDocument(new InputFile(answeredBuffer, `${quizTitle}_مجابة.pdf`), {
+      caption: `📋 **النسخة المجابة — كويز «المتفوق»**
 
-📌 **الموضوع:** ${title.replace(/_/g, ' ')}
-🧭 **المسار:** ${getTrackBadge(session.track)}
-🔢 **عدد الأسئلة:** ${session.quizSettings.count}
-📊 **الصعوبة:** ${getDifficultyName(session.quizSettings.difficulty)}
-🎨 **الهوية:** ${session.identity}
+📌 الموضوع: ${title.replace(/_/g, ' ')}
+📝 5 أسئلة مقالية مع خطوات الحل والإجابات النموذجية
 
-🌟 **نجتهد لنوفق** 🌟
-`,
+🌟 نجتهد لنوفق 🌟`
+    });
+    await ctx.replyWithDocument(new InputFile(unansweredBuffer, `${quizTitle}_غير_مجابة.pdf`), {
+      caption: `📝 **النسخة غير المجابة — للطالب**
+
+📌 الموضوع: ${title.replace(/_/g, ' ')}
+✍️ نفس الأسئلة مع مساحات مخصصة للحل
+
+يمكنك الآن حل الأسئلة ثم مراجعة النسخة المجابة.`,
       reply_markup: new InlineKeyboard()
-        .text('🌐 كويز ويب تفاعلي (HTML)', 'quiz_html_last')
+        .text('🌐 كويز ويب تفاعلي — 10 أسئلة', 'quiz_html_last')
         .row()
-        .text('⚡ كويز تفاعلي (Poll)', 'quiz_quick_poll')
-        .text('🔄 كويز آخر', 'quiz_pdf_last')
-        .row()
-        .url('📢 قناة المتفوق الرسمية', 'https://t.me/+OAYxVF1Uqcs2NmE0')
-        .row()
+        .text('🔄 كويز مقالي آخر', 'quiz_pdf_last')
         .text('🔙 القائمة الرئيسية', 'main_menu')
     });
 

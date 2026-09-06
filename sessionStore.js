@@ -16,7 +16,8 @@ function defaultSession() {
     awaitingEdit: false,
     awaitingQuizTopic: false,
     lessonHistory: [],
-    quizSettings: { count: 5, type: 'mcq', difficulty: 'mixed' }
+    quizSettings: { count: 10, type: 'mcq', difficulty: 'mixed' },
+    quizSettingsVersion: 2
   };
 }
 
@@ -25,7 +26,12 @@ function loadSessions() {
     if (!fs.existsSync(sessionFile)) return;
     const data = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));
     for (const [chatId, session] of Object.entries(data)) {
-      sessions.set(String(chatId), { ...defaultSession(), ...session, quizSettings: { ...defaultSession().quizSettings, ...(session.quizSettings || {}) } });
+      const merged = { ...defaultSession(), ...session, quizSettings: { ...defaultSession().quizSettings, ...(session.quizSettings || {}) } };
+      if (!session.quizSettingsVersion) {
+        merged.quizSettings = { ...merged.quizSettings, count: 10, type: 'mcq' };
+        merged.quizSettingsVersion = 2;
+      }
+      sessions.set(String(chatId), merged);
     }
   } catch (error) {
     console.warn('تعذر تحميل جلسات المستخدمين، سيبدأ التخزين من جديد:', error.message);
