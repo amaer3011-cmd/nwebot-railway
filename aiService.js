@@ -3,7 +3,7 @@ import { getSystemPrompt } from './systemPrompt.js';
 import { processGeneratedHtml } from './fontsHelper.js';
 import { getApiKeyPool } from './apiKeyManager.js';
 
-const PLAN_MODELS = ['gemini-2.5-flash', 'gemini-3.6-flash'];
+const PLAN_MODELS = ['gemini-2.5-flash'];
 
 function isQuotaError(error) {
   const message = String(error?.message || error || '');
@@ -94,7 +94,7 @@ export async function generateLessonHtml({
   userPrompt,
   selectedIdentity = '🎀 الورقة الملونة',
   isPartner = true,
-  modelName = 'gemini-3.6-flash',
+  modelName = 'gemini-2.5-flash',
   imageBuffer = null,
   imageMimeType = 'image/jpeg',
   images = [],
@@ -238,7 +238,7 @@ export async function modifyLessonHtml({
   editInstructions,
   selectedIdentity = '🎀 الورقة الملونة',
   isPartner = true,
-  modelName = 'gemini-3.6-flash',
+  modelName = 'gemini-2.5-flash',
   track = 'auto'
 }) {
   const keyPool = getApiKeyPool(apiKey);

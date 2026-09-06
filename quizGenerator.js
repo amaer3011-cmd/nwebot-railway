@@ -159,7 +159,7 @@ function isQuotaError(error) {
 export async function generateInteractiveQuiz({
   apiKey,
   contentText,
-  modelName = 'gemini-3.6-flash',
+  modelName = 'gemini-2.5-flash',
   count = 5,
   difficulty = 'mixed',
   quizType = 'mcq',
@@ -328,7 +328,7 @@ ${contentText.slice(0, 12000)}
 export async function generateQuizPdf({
   apiKey,
   contentText,
-  modelName = 'gemini-3.6-flash',
+  modelName = 'gemini-2.5-flash',
   count = 10,
   selectedIdentity = '🎀 الورقة الملونة',
   isPartner = true,
@@ -499,7 +499,7 @@ export function createUnansweredQuizHtml(html) {
 export async function generateSelfGradingHtmlQuiz({
   apiKey,
   contentText,
-  modelName = 'gemini-3.6-flash',
+  modelName = 'gemini-2.5-flash',
   count = 10,
   difficulty = 'mixed',
   quizType = 'mcq',
