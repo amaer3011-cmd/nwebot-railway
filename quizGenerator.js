@@ -606,6 +606,17 @@ export async function generateSelfGradingHtmlQuiz({
       width: 0%;
       transition: width 0.3s ease;
     }
+    .progress-live {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin: -16px 0 22px;
+      color: #475569;
+      font-size: 0.9rem;
+      font-weight: 800;
+    }
+    .progress-live strong { color: var(--secondary); }
     .q-card {
       background: var(--card-bg);
       border: 2px solid var(--border-color);
@@ -802,6 +813,10 @@ export async function generateSelfGradingHtmlQuiz({
   <div class="progress-bar-wrap">
     <div class="progress-bar-fill" id="progressFill"></div>
   </div>
+  <div class="progress-live" role="status" aria-live="polite">
+    <span id="progressText">تمت الإجابة على 0 من ${questions.length} سؤال</span>
+    <strong id="progressPercent">0%</strong>
+  </div>
 
   <!-- صندوق النتيجة بعد التسليم -->
   <div class="result-hero" id="resultHero">
@@ -909,6 +924,9 @@ export async function generateSelfGradingHtmlQuiz({
     });
     const percent = Math.round((answered / questions.length) * 100);
     document.getElementById('progressFill').style.width = percent + '%';
+    document.getElementById('progressText').textContent =
+      'تمت الإجابة على ' + answered + ' من ' + questions.length + ' سؤال';
+    document.getElementById('progressPercent').textContent = percent + '%';
   }
 
   function gradeQuiz() {
@@ -976,6 +994,8 @@ export async function generateSelfGradingHtmlQuiz({
     document.getElementById('submitBtn').style.display = 'inline-flex';
     document.getElementById('resetBtn').style.display = 'none';
     document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressText').textContent = 'تمت الإجابة على 0 من ' + questions.length + ' سؤال';
+    document.getElementById('progressPercent').textContent = '0%';
     renderQuiz();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }

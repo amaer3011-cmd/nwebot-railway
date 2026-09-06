@@ -640,6 +640,7 @@ async function handleQuizHtml(ctx, session, customContentText = null, customTitl
   const statusMsg = await ctx.reply(`🌐 **جاري إنشاء كويز تفاعلي ذاتي التصحيح (HTML) بمعايير البكالوريا 2027...**\n• عدد الأسئلة: ${htmlQuizCount}\n• النوع: اختيار من متعدد مع تصحيح فوري\n• الصعوبة: ${getDifficultyName(session.quizSettings.difficulty)}`, { parse_mode: 'Markdown' });
 
   try {
+    await updateProgress(ctx, statusMsg, 'المرحلة 1 من 2 — تجهيز كويز HTML', 10, 'تم استلام محتوى الدرس، وجاري بناء بنك الأسئلة من المصدر فقط.');
     const htmlCode = await generateSelfGradingHtmlQuiz({
       apiKey: geminiApiKey,
       contentText: contentText,
@@ -652,6 +653,8 @@ async function handleQuizHtml(ctx, session, customContentText = null, customTitl
       explicitTrack: session.track || 'auto'
     });
 
+    await updateProgress(ctx, statusMsg, 'المرحلة 1 من 2 — مراجعة الكويز', 65, 'تم توليد الأسئلة؛ جاري التأكد من التصحيح الفوري وشريط التقدم قبل الإرسال.');
+
     const tempDir = path.join(__dirname, 'temp');
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
@@ -659,6 +662,7 @@ async function handleQuizHtml(ctx, session, customContentText = null, customTitl
     const htmlPath = path.join(tempDir, htmlFilename);
     fs.writeFileSync(htmlPath, htmlCode, 'utf-8');
 
+    await updateProgress(ctx, statusMsg, 'المرحلة 1 من 2 — اكتملت', 100, 'كويز HTML جاهز. بعد حله يمكنك الانتقال مباشرة إلى المرحلة الثانية المقالية.');
     try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
 
     await ctx.replyWithDocument(new InputFile(htmlPath, htmlFilename), {
@@ -679,7 +683,7 @@ async function handleQuizHtml(ctx, session, customContentText = null, customTitl
 🌟 **نجتهد لنوفق** 🌟
 `,
       reply_markup: new InlineKeyboard()
-        .text('📋 كويز PDF مطبوع', 'quiz_pdf_last')
+        .text('📋 المرحلة 2: كويز مقالي', 'quiz_pdf_last')
         .text('⚡ كويز Telegram Poll', 'quiz_quick_poll')
         .row()
         .text('🔙 القائمة الرئيسية', 'main_menu')
@@ -811,6 +815,7 @@ async function handleQuizPdf(ctx, session, customContentText = null, customTitle
 • الصعوبة: ${getDifficultyName(session.quizSettings.difficulty)}`, { parse_mode: 'Markdown' });
 
   try {
+    await updateProgress(ctx, statusMsg, 'المرحلة 2 من 2 — بناء الأسئلة المقالية', 15, 'جاري إنشاء أسئلة تحليلية مرتبطة بمحتوى الدرس فقط.');
     let answeredHtml = await generateQuizPdf({
       apiKey: geminiApiKey,
       contentText,
@@ -825,12 +830,15 @@ async function handleQuizPdf(ctx, session, customContentText = null, customTitle
     });
 
     answeredHtml = processGeneratedHtml(answeredHtml);
+    await updateProgress(ctx, statusMsg, 'المرحلة 2 من 2 — تجهيز النسختين', 55, 'تم إنشاء النسخة المجابة؛ جاري استخراج نسخة الطالب وإخفاء مفتاح الإجابة بالكامل.');
     const unansweredHtml = processGeneratedHtml(createUnansweredQuizHtml(answeredHtml));
     const quizTitle = `كويز_المتفوق_مقالي_${title.replace(/[\/:*?"<>|]/g, '')}`;
     const isLandscape = session.identity.includes('Landscape') || session.identity.includes('الصفحتين');
     const answeredBuffer = await renderSafePdf(answeredHtml, isLandscape);
+    await updateProgress(ctx, statusMsg, 'المرحلة 2 من 2 — تحويل PDF', 78, 'جاري تحويل النسخة المجابة ونسخة الطالب إلى ملفي PDF منفصلين.');
     const unansweredBuffer = await renderSafePdf(unansweredHtml, isLandscape);
 
+    await updateProgress(ctx, statusMsg, 'المرحلة 2 من 2 — اكتملت', 100, 'تم تجهيز النسخة المجابة والنسخة غير المجابة بنجاح.');
     try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
 
     await ctx.replyWithDocument(new InputFile(answeredBuffer, `${quizTitle}_مجابة.pdf`), {
