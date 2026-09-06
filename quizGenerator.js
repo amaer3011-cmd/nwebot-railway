@@ -303,7 +303,10 @@ ${contentText.slice(0, 12000)}
           }));
         }
       } catch (err) {
-        if (isQuotaError(err)) throw new Error('انتهت حصة Gemini الحالية. انتظر حتى تجدد الحصة أو استخدم مفتاحاً/خطة مدفوعة ثم أعد المحاولة.');
+        if (isQuotaError(err)) {
+          lastError = new Error('انتهت حصة Gemini الحالية لكل المفاتيح المتاحة.');
+          break;
+        }
         const message = String(err?.message || '');
         const statusMatch = message.match(/\b(429|503)\b/);
         const status = err?.status || (statusMatch ? Number(statusMatch[1]) : null);
@@ -468,7 +471,10 @@ ${contentText.slice(0, 12000)}
           return processGeneratedHtml(validateGeneratedQuizHtml(responseText));
         }
       } catch (err) {
-        if (isQuotaError(err)) throw new Error('انتهت حصة Gemini الحالية. انتظر حتى تجدد الحصة أو استخدم مفتاحاً/خطة مدفوعة ثم أعد المحاولة.');
+        if (isQuotaError(err)) {
+          lastError = new Error('انتهت حصة Gemini الحالية لكل المفاتيح المتاحة.');
+          break;
+        }
         console.warn(`فشلت محاولة كويز PDF بالمفتاح [${keyIndex + 1}/${keyPool.length}]:`, err.message);
         lastError = err;
       }

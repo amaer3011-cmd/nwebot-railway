@@ -81,7 +81,10 @@ ${userPrompt || 'حلل الصور أو الصوت المرفقين فقط.'}
         const plan = result.response.text()?.trim();
         if (plan && plan.length > 80) return plan.slice(0, 16000);
       } catch (error) {
-        if (isQuotaError(error)) throw quotaError();
+        if (isQuotaError(error)) {
+          lastError = quotaError();
+          break;
+        }
         lastError = error;
       }
     }
@@ -222,7 +225,10 @@ ${lessonPlan || 'خطة مستخرجة داخلياً من المصدر فقط.'
           return processGeneratedHtml(responseText);
         }
       } catch (err) {
-        if (isQuotaError(err)) throw quotaError();
+        if (isQuotaError(err)) {
+          lastError = quotaError();
+          break;
+        }
         console.warn(`فشلت المحاولة بالمفتاح [${keyIndex + 1}/${keyPool.length}]:`, err.message);
         lastError = err;
       }
@@ -285,7 +291,10 @@ ${existingHtml}
           return processGeneratedHtml(responseText);
         }
       } catch (err) {
-        if (isQuotaError(err)) throw quotaError();
+        if (isQuotaError(err)) {
+          lastError = quotaError();
+          break;
+        }
         lastError = err;
       }
     }
