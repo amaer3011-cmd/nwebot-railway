@@ -11,6 +11,9 @@ export const GOOGLE_FONTS_IMPORTS = `
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" onload="if(window.renderMathInElement) renderMathInElement(document.body);"></script>
 `;
 
+const REQUIRED_TYPOGRAPHY_LINK = '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Lalezar&family=Noto+Sans+Arabic:wght@400;500;600;700;800&family=Poppins:wght@500;600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">';
+const KATEX_BOOTSTRAP = `<script id="motafawiq-katex-bootstrap">window.addEventListener('load',function(){setTimeout(function(){if(window.renderMathInElement){renderMathInElement(document.body,{delimiters:[{left:'\\\\[',right:'\\\\]',display:true},{left:'\\\\(',right:'\\\\)',display:false}],throwOnError:false});}},0);});</script>`;
+
 // قواعد مشتركة لضبط إخراج PDF بصرف النظر عن الهوية البصرية التي اختارها النموذج.
 // الهدف: تدفق طبيعي للمحتوى، منع انقسام البطاقات والجداول، وإبقاء الفوتر أسفل الصفحة.
 export const PRINT_LAYOUT_OVERRIDES = `
@@ -139,8 +142,20 @@ export function processGeneratedHtml(htmlCode) {
     cleanHtml = cleanHtml.replace('<head>', `<head>\n${GOOGLE_FONTS_IMPORTS}`);
   }
 
+  // قد يضيف النموذج رابط خطوط قديماً؛ وجود Google Fonts وحده لا يكفي.
+  if (cleanHtml.includes('<head>') && !cleanHtml.includes('Noto+Sans+Arabic')) {
+    cleanHtml = cleanHtml.replace('</head>', `${REQUIRED_TYPOGRAPHY_LINK}\n</head>`);
+  }
+
   if (cleanHtml.includes('<head>') && !cleanHtml.includes('katex.min.css')) {
     cleanHtml = cleanHtml.replace('</head>', `${GOOGLE_FONTS_IMPORTS}\n</head>`);
+  }
+
+  // بعض المخرجات تحتوي على delimiters مكسورة مثل $\(...\)$ داخل onload.
+  // نلغي هذا الاستدعاء ونضيف تهيئة واحدة صحيحة بعد تحميل مكتبة KaTeX.
+  cleanHtml = cleanHtml.replace(/\s+onload="[^"]*renderMathInElement[^\"]*"/gi, '');
+  if (!cleanHtml.includes('motafawiq-katex-bootstrap')) {
+    cleanHtml = cleanHtml.replace('</body>', `${KATEX_BOOTSTRAP}\n</body>`);
   }
 
   if (cleanHtml.includes('<head>') && !cleanHtml.includes('motafawiq-print-layout')) {
