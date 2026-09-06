@@ -915,6 +915,27 @@ function extractTextFromHtml(html) {
     .slice(0, 12000);
 }
 
+function reviewGeneratedLesson(html) {
+  const text = extractTextFromHtml(html);
+  const problems = [];
+  if (!/^\s*(<!doctype html|<html)/i.test(html || '')) problems.push('بداية HTML غير صحيحة');
+  if (!/<\/html>\s*$/i.test(html || '')) problems.push('نهاية HTML ناقصة');
+  if (text.length < 120) problems.push('المحتوى النصي قصير جداً');
+  if (!/<div[^>]*class=["'][^"']*pg/i.test(html || '')) problems.push('لا توجد حاويات صفحات A4');
+  if (/X{4,}|\[رمز\]|\\sqrt\{\}|\\lambda\s*(?:sqrt|frac)|<\/html>[\s\S]+/i.test(html || '')) problems.push('رموز تعويضية أو LaTeX مشوه');
+  if (/```(?:html|css)?/i.test(html || '')) problems.push('بقايا Markdown خارج HTML');
+  return { ok: problems.length === 0, problems, textLength: text.length };
+}
+
+async function updateProgress(ctx, statusMsg, stage, percent, detail) {
+  if (!statusMsg) return;
+  const filled = Math.round(percent / 10);
+  const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
+  try {
+    await safeEditMessageText(ctx, `⏳ **${stage}**\n[${bar}] ${percent}%\n${detail}`, { parse_mode: 'Markdown' });
+  } catch (_) {}
+}
+
 // ⚡ 4. محرك المعالجة المباشر وإرسال ملف PDF واحد فقط مع خيارات التعديل
 async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageMimeType, images = [], audioBuffer, audioMimeType, isEdit = false }) {
   if (!hasValidApiKey()) {
@@ -945,9 +966,11 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
   }, 4000);
 
   try {
+    await updateProgress(ctx, statusMsg, 'استقبال وتجهيز المصدر', 10, 'تم استلام المحتوى، وجاري تجهيز النصوص والصور للمراجعة.');
     let htmlCode = '';
     if (isEdit && session.lastHtml) {
       // تعديل ملف HTML موجود
+      await updateProgress(ctx, statusMsg, 'تحليل التعديل والملف السابق', 25, 'جاري فهم المطلوب والمحافظة على المحتوى الصحيح.');
       htmlCode = await modifyLessonHtml({
         apiKey: geminiApiKey,
         existingHtml: session.lastHtml,
@@ -958,6 +981,7 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
       });
     } else {
       // توليد ملف HTML جديد
+      await updateProgress(ctx, statusMsg, 'تحليل الصور والمحتوى', 25, 'جاري قراءة الصور واستخراج العناوين والقوانين والأمثلة.');
       htmlCode = await generateLessonHtml({
         apiKey: geminiApiKey,
         userPrompt: prompt,
@@ -973,6 +997,13 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
         track: session.track || 'auto'
       });
     }
+
+    await updateProgress(ctx, statusMsg, 'تنظيم المحتوى وتصميم الصفحات', 60, 'جاري توزيع الشرح والقوانين والأمثلة ومساحات الحل بدون تزاحم.');
+    const quality = reviewGeneratedLesson(htmlCode);
+    if (!quality.ok) {
+      throw new Error(`فشلت مراجعة الملزمة قبل التحويل: ${quality.problems.join('، ')}`);
+    }
+    await updateProgress(ctx, statusMsg, 'مراجعة الملزمة', 75, `تم فحص HTML والمعادلات والصفحات — ${quality.textLength} حرفاً علمياً صالحاً.`);
 
     // استخراج اسم الدرس ديناميكياً لتسمية الملف باسم محتواه
     const lessonTitle = extractLessonTitle(htmlCode, 'ملزمة_المتفوق');
@@ -1003,6 +1034,7 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
       : `المتفوق — ${lessonTitle}.pdf`;
 
     // ⚡ توليد سريع ومباشر للـ PDF في الذاكرة (In-Memory Buffer) دون الحاجة للقرص
+    await updateProgress(ctx, statusMsg, 'تحويل ومراجعة ملف PDF', 90, 'جاري تحويل الملف، والتأكد من جاهزيته قبل الإرسال.');
     const isLandscape = session.identity.includes('Landscape') || session.identity.includes('الصفحتين');
     const pdfBuffer = await renderHtmlDirectlyToPdf(htmlCode, isLandscape);
 
@@ -1024,6 +1056,7 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
       .text('💻 كود HTML الاحتياطي', 'get_backup_html')
       .text('🔙 القائمة الرئيسية', 'main_menu');
 
+    await updateProgress(ctx, statusMsg, 'اكتمل الملف', 100, 'تمت المراجعة والتحويل بنجاح، جاري إرسال الملف الآن.');
     // 📄 إرسال ملف PDF واحد فقط باسم محتواه
     await ctx.replyWithDocument(new InputFile(pdfBuffer, pdfDisplayFilename), {
       caption: `✨ **تم إعداد ملزمة «${lessonTitle.replace(/_/g, ' ')}» بنجاح!**\n\n🎯 **المسار:** ${getTrackBadge(session.track)}\n🎨 **الهوية:** ${session.identity}\n⚡ **النظام:** البكالوريا المصرية 2027\n\n👇 يمكنك تعديل هذا الملف أو إنشاء كويز تفاعلي فوري من الأزرار أدناه:`,
