@@ -1,5 +1,6 @@
 import puppeteer from 'puppeteer';
 import { existsSync } from 'fs';
+import path from 'path';
 import { execSync } from 'child_process';
 
 let sharedBrowser = null;

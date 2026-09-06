@@ -5,6 +5,29 @@ import { detectSubjectGuidelines } from './baccalaureateStandards2027.js';
 import { getApiKeyPool } from './apiKeyManager.js';
 
 /**
+ * توحيد أخطاء OCR الشائعة في المعادلات قبل عرضها في Telegram أو HTML.
+ * لا نستبدل حرف v عشوائياً؛ نعالج فقط الأنماط المعروفة التي يقصد بها الجذر.
+ */
+function normalizeMathNotation(value) {
+  return String(value || '')
+    .replace(/v\s*\(\s*2\s*\(([^()]+)\)\s*\)/g, '\\sqrt{2($1)}')
+    .replace(/v\s*\(\s*2\s*([a-zA-Z])\s*([a-zA-Z])\s*\)/g, '\\sqrt{2$1$2}')
+    .replace(/\bt\s*=\s*v\s*\(\s*2\s*([^()]+)\s*\/\s*([^()]+)\s*\)/g, 't = \\sqrt{\\frac{2$1}{$2}}')
+    .replace(/\bi\s*=\s*0?55\s*\)/g, 'i = 0.55')
+    .replace(/\b(\d+(?:\.\d+)?)\s*text\s*([a-zA-Z/²³]+)/gi, '$1 \\mathrm{$2}');
+}
+
+function normalizeQuizItem(item) {
+  return {
+    ...item,
+    question: normalizeMathNotation(item.question).trim(),
+    options: (item.options || []).map(option => normalizeMathNotation(option).trim()),
+    explanation: normalizeMathNotation(item.explanation || '').trim(),
+    learningOutcome: normalizeMathNotation(item.learningOutcome || '').trim()
+  };
+}
+
+/**
  * مولّد الكويزات الاحترافي لبوت «المتفوق»
  * يدعم:
  * - كويز اختيار من متعدد (Telegram Quiz Poll)
@@ -87,6 +110,18 @@ ${subjectInfo.guidelines}
 ⚖️ المبادئ الفنية الصارمة:
 ${subjectInfo.generalPrinciples.map(p => `• ${p}`).join('\n')}
 
+🧮 **قواعد إلزامية للرياضيات والفيزياء:**
+- استخدم LaTeX القياسي فقط داخل النص: \\\\sqrt{...} للجذر، وv_i وv_f وa_x للرموز السفلية.
+- ممنوع استخدام الحرف v بديلاً عن الجذر، وممنوع كتابة text أو أقواس زائدة داخل المعادلة.
+- اكتب الوحدات بصيغة \\\\mathrm{m/s} أو \\\\mathrm{m/s^2}، وتحقق من كل رقم وإشارة قبل الإخراج.
+
+📊 **قواعد الجداول:**
+- إذا احتاج السؤال أو التفسير جدولاً، أخرجه كـ Markdown Table صحيح بأعمدة ثابتة: العنوان | نوع الحركة | القيمة | العلاقة.
+- افصل الرموز والمعادلات عن النص العربي داخل الخلايا، ولا تخلط RTL/LTR في خلية واحدة دون مسافات واضحة.
+
+🗣️ **الشرح الودود:**
+- عند شرح مفهوم فيزيائي، ابدأ بسطر مستقل بعنوان «الفكرة ببساطة (بالعامية المصرية)» وبمثال يومي مشجع من سطرين أو ثلاثة.
+
 يجب أن ينتهي المخرج كـ JSON Array يتبع هذا التنسيق بالضبط:
 [
   {
@@ -119,10 +154,11 @@ ${contentText.slice(0, 6000)}
           if (validItems.length === 0) throw new Error('النموذج لم يُرجع أسئلة منظمة وصالحة');
 
           return validItems.slice(0, count).map(item => ({
-            question: item.question.trim().slice(0, 500),
-            options: item.options.slice(0, 4).map(opt => String(opt).trim().slice(0, 180)),
+            ...normalizeQuizItem(item),
+            question: normalizeQuizItem(item).question.slice(0, 500),
+            options: normalizeQuizItem(item).options.slice(0, 4).map(opt => String(opt).slice(0, 180)),
             correctOptionIndex: Math.min(Number(item.correctOptionIndex), Math.min(item.options.length, 4) - 1),
-            explanation: item.explanation ? String(item.explanation).trim().slice(0, 400) : 'الإجابة مستندة إلى القاعدة أو المثال الوارد في الدرس.',
+            explanation: item.explanation ? normalizeMathNotation(String(item.explanation)).trim().slice(0, 400) : 'الإجابة مستندة إلى القاعدة أو المثال الوارد في الدرس.',
             learningOutcome: item.learningOutcome ? String(item.learningOutcome).trim().slice(0, 140) : 'تطبيق ناتج تعلم من الدرس المصدر',
             difficulty: ['easy', 'medium', 'hard'].includes(item.difficulty) ? item.difficulty : 'mixed'
           }));
@@ -219,6 +255,23 @@ ${customCss}
 4. **مفتاح الإجابات:** في نهاية الكويز، جدول أو بطاقة \`.answer-key\` بالإجابات النموذجية مع شرح موجز لكل إجابة
 5. **الفوتر:** «ولا تنسو الصلاة علي النبي ﷺ» + «نجتهد لنوفق 🌟» + @A7med19_7
 
+🧮 **تنسيق المعادلات والرموز — إلزامي:**
+- استخدم KaTeX بصيغة \\\\(...\\) داخل السطر و\\\\[...\\] للمعادلة المنفصلة.
+- اكتب الجذر دائماً \\\\sqrt{...}، ولا تستخدم v كبديل للجذر.
+- راجع الرموز السفلية مثل v_i وv_f وa_x والوحدات مثل \\\\mathrm{m/s}.
+
+📊 **الجداول — إلزامي:**
+- أنشئ الجداول بعنصر HTML `<table>` حقيقي، مع صف رأس واضح وأعمدة منفصلة: العنوان، نوع الحركة، القيمة، العلاقة.
+- امنع تداخل RTL/LTR: ضع كل معادلة داخل وسم span باتجاه ltr وبكلاس math، مع مسافات حولها.
+
+🗣️ **شرح مبسط — إلزامي قبل الشرح الأكاديمي:**
+- أضف بطاقة بعنوان «الفكرة ببساطة (بالعامية المصرية)» من 2–3 أسطر وبمثال يومي مشجع.
+
+📝 **مفتاح الإجابات — إلزامي:**
+- لكل سؤال بطاقة مستقلة داخل .answer-key.
+- اكتب رقم السؤال وتصنيفه، ثم في سطر مستقل الإجابة النهائية بخط <strong>، ثم خطوات الحل في قائمة <ul><li>...</li></ul>.
+- لا تضع الإجابات كلها في سطر واحد ولا تخلط الإجابة مع نص السؤال.
+
 ⚠️ الدقة العلمية 100%: تأكد من صحة كل سؤال وصحة الخيار المعلم كإجابة صحيحة قبل الإخراج بدون أي التباس.
 
 📄 القواعد التقنية:
@@ -292,6 +345,9 @@ export async function generateSelfGradingHtmlQuiz({
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Lalezar&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
   <style>
     :root {
       --primary: #178F94;
@@ -442,6 +498,9 @@ export async function generateSelfGradingHtmlQuiz({
       line-height: 1.6;
       color: var(--dark);
     }
+    .math, .katex { direction: ltr; unicode-bidi: embed; }
+    .katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+    .explanation-box ul { margin: 8px 22px 0 0; }
     .q-options {
       display: flex;
       flex-direction: column;
@@ -625,6 +684,10 @@ export async function generateSelfGradingHtmlQuiz({
     const container = document.getElementById('questionsContainer');
     container.innerHTML = '';
 
+    const escapeHtml = (value) => String(value ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
     questions.forEach((q, qIndex) => {
       const card = document.createElement('div');
       card.className = 'q-card';
@@ -635,7 +698,7 @@ export async function generateSelfGradingHtmlQuiz({
         optionsHtml += \`
           <label class="opt-label" id="opt-label-\${qIndex}-\${optIndex}">
             <input type="radio" name="q\${qIndex}" value="\${optIndex}" onchange="updateProgress()">
-            <span>\${opt}</span>
+            <span>\${escapeHtml(opt)}</span>
           </label>
         \`;
       });
@@ -643,19 +706,29 @@ export async function generateSelfGradingHtmlQuiz({
       card.innerHTML = \`
         <div class="q-header">
           <div class="q-num">\${qIndex + 1}</div>
-          <div class="q-text">\${q.question}</div>
+          <div class="q-text">\${escapeHtml(q.question)}</div>
         </div>
         <div class="q-options">
           \${optionsHtml}
         </div>
         <div class="explanation-box" id="exp-\${qIndex}">
           <div class="learning-tag">🎯 \${q.learningOutcome || 'نواتج التعلم والتفكير 2027'}</div>
-          <div>💡 <strong>التفسير والتحليل العلمي:</strong> \${q.explanation}</div>
+          <div>💡 <strong>التفسير والتحليل العلمي:</strong> \${escapeHtml(q.explanation)}</div>
         </div>
       \`;
 
       container.appendChild(card);
     });
+
+    if (window.renderMathInElement) {
+      renderMathInElement(container, {
+        delimiters: [
+          { left: '\\\\[', right: '\\\\]', display: true },
+          { left: '\\\\(', right: '\\\\)', display: false }
+        ],
+        throwOnError: false
+      });
+    }
 
     startTimer();
   }

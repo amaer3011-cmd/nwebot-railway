@@ -73,10 +73,18 @@ export function processGeneratedHtml(htmlCode) {
   // كما نعالج \text{...} حتى لا تظهر ككلمة خام داخل ملف PDF.
   cleanHtml = cleanHtml.replace(/\$([^$\n]+)\$/g, (_, expression) => `\\(${expression}\\)`);
   cleanHtml = cleanHtml.replace(/\\text\{([^{}]+)\}/g, '\\mathrm{$1}');
+  // تصحيح نمط OCR الشائع الذي يستبدل الجذر بالحرف v في القوانين.
+  cleanHtml = cleanHtml
+    .replace(/v\s*\(\s*2\s*([a-zA-Z])\s*([a-zA-Z])\s*\)/g, '\\sqrt{2$1$2}')
+    .replace(/t\s*=\s*v\s*\(\s*2\s*([^()]+)\/\s*([^()]+)\s*\)/g, 't = \\sqrt{\\frac{2$1}{$2}}');
 
   // 3. تضمين الخطوط ومكتبة المعادلات KaTeX بالهيد إن لم تكن موجودة
   if (!cleanHtml.includes('fonts.googleapis.com') && cleanHtml.includes('<head>')) {
     cleanHtml = cleanHtml.replace('<head>', `<head>\n${GOOGLE_FONTS_IMPORTS}`);
+  }
+
+  if (cleanHtml.includes('<head>') && !cleanHtml.includes('katex.min.css')) {
+    cleanHtml = cleanHtml.replace('</head>', `${GOOGLE_FONTS_IMPORTS}\n</head>`);
   }
 
   if (cleanHtml.includes('<head>') && !cleanHtml.includes('motafawiq-print-layout')) {
