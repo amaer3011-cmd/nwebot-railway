@@ -698,6 +698,30 @@ async function handleQuizHtml(ctx, session, customContentText = null, customTitl
   }
 }
 
+// Telegram يفرض 300 حرف للسؤال، و100 حرف لكل اختيار، و200 حرف للتفسير.
+function telegramPollText(value, maxLength) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, Math.max(0, maxLength - 1)).trim()}…`;
+}
+
+function prepareTelegramPollQuestion(question) {
+  const options = (Array.isArray(question.options) ? question.options : [])
+    .slice(0, 10)
+    .map(option => telegramPollText(option, 100));
+  const correctOptionIndex = Math.min(
+    Math.max(Number(question.correctOptionIndex) || 0, 0),
+    Math.max(options.length - 1, 0)
+  );
+
+  return {
+    text: telegramPollText(question.question, 300),
+    options,
+    correctOptionIndex,
+    explanation: telegramPollText(question.explanation, 200)
+  };
+}
+
 // 🧠 معالج كويز Telegram Poll التفاعلي
 async function handleQuizPoll(ctx, session, customContentText = null, customTitle = null) {
   const contentText = customContentText || session.lastContentText || extractTextFromHtml(session.lastHtml || '');
@@ -730,16 +754,20 @@ async function handleQuizPoll(ctx, session, customContentText = null, customTitl
 
     await ctx.reply(`🧠 **كويز المتفوق — ${title}**\n🧭 **المسار:** ${getTrackBadge(session.track)}\n📊 ${quizItems.length} سؤال | ${getDifficultyName(session.quizSettings.difficulty)}\n\n🎯 أجب على كل سؤال واضغط الإجابة الصحيحة!`, { parse_mode: 'Markdown' });
 
-    // إرسال كل سؤال كـ Telegram Quiz Poll
+    // إرسال كل سؤال كـ Telegram Quiz Poll مع احترام حدود Bot API.
+    let sentPolls = 0;
     for (let i = 0; i < quizItems.length; i++) {
       const q = quizItems[i];
       try {
-        await ctx.api.sendPoll(ctx.chat.id, `${i + 1}/${quizItems.length}. ${q.question}`, q.options, {
+        const poll = prepareTelegramPollQuestion(q);
+        if (poll.options.length < 2) throw new Error('السؤال لا يحتوي على اختيارين صالحين على الأقل');
+        await ctx.api.sendPoll(ctx.chat.id, `${i + 1}/${quizItems.length}. ${poll.text}`, poll.options, {
           type: 'quiz',
-          correct_option_id: q.correctOptionIndex,
-          explanation: q.explanation || undefined,
+          correct_option_id: poll.correctOptionIndex,
+          explanation: poll.explanation || undefined,
           is_anonymous: false
         });
+        sentPolls++;
         if (i < quizItems.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 800));
         }
@@ -748,7 +776,7 @@ async function handleQuizPoll(ctx, session, customContentText = null, customTitl
       }
     }
 
-    await ctx.reply(`✅ **تم إرسال كويز المتفوق بنجاح! (${quizItems.length} سؤال)**\n\n🌟 نجتهد لنوفق 🌟`, {
+    await ctx.reply(`✅ **تم إرسال كويز المتفوق بنجاح! (${sentPolls} من ${quizItems.length} سؤال)**\n\n🌟 نجتهد لنوفق 🌟`, {
       parse_mode: 'Markdown',
       reply_markup: new InlineKeyboard()
         .text('🌐 كويز ويب تفاعلي (HTML)', 'quiz_html_last')

@@ -55,7 +55,8 @@ export async function generateInteractiveQuiz({
   if (!apiKey) throw new Error('مفتاح API غير متوفر');
 
   const keyPool = getQuizApiKeyPool(apiKey);
-  const modelsToTry = [modelName, 'gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.6-flash'];
+  // نبدأ بالنماذج الأكثر استقراراً، ونترك النموذج المطلوب كخيار أخير.
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.6-flash', modelName];
   const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
   let lastError = null;
 
@@ -164,7 +165,16 @@ ${contentText.slice(0, 6000)}
           }));
         }
       } catch (err) {
-        console.warn(`فشلت محاولة الكويز بالمفتاح [${keyIndex + 1}/${keyPool.length}]:`, err.message);
+        const message = String(err?.message || '');
+        const statusMatch = message.match(/\b(429|503)\b/);
+        const status = err?.status || (statusMatch ? Number(statusMatch[1]) : null);
+        if (status === 503) {
+          console.warn(`النموذج ${currentModel} مزدحم مؤقتاً (503)، سيتم الانتقال إلى fallback التالي.`);
+        } else if (status === 429) {
+          console.warn(`تم تجاوز حصة النموذج ${currentModel} لهذا المفتاح (429)، سيتم الانتقال إلى نموذج/مفتاح آخر.`);
+        } else {
+          console.warn(`فشلت محاولة الكويز بالمفتاح [${keyIndex + 1}/${keyPool.length}] نموذج ${currentModel}:`, message);
+        }
         lastError = err;
       }
     }
