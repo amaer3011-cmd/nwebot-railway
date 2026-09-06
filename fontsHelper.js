@@ -42,8 +42,10 @@ export const PRINT_LAYOUT_OVERRIDES = `
     text-align: center !important;
     break-inside: avoid !important;
   }
-  .formula-box .katex-display { margin: 2mm 0 !important; overflow-x: auto; overflow-y: hidden; }
-  .formula-box .formula-title { font-weight: 800; color: #2B3445; margin-bottom: 1mm; }
+  .formula-box .katex-display { margin: 3mm 0 4mm !important; padding-bottom: 2mm !important; overflow-x: auto; overflow-y: hidden; }
+  .formula-box .formula-title { font-weight: 800; color: #2B3445; margin-bottom: 2mm; }
+  .formula-box + *, table + *, .katex-display + * { margin-top: 4mm !important; }
+  table td, table th { padding: 2.5mm 3mm !important; vertical-align: middle; }
 </style>
 `;
 
@@ -75,8 +77,10 @@ export function processGeneratedHtml(htmlCode) {
   cleanHtml = cleanHtml.replace(/\\text\{([^{}]+)\}/g, '\\mathrm{$1}');
   // تصحيح نمط OCR الشائع الذي يستبدل الجذر بالحرف v في القوانين.
   cleanHtml = cleanHtml
-    .replace(/v\s*\(\s*2\s*([a-zA-Z])\s*([a-zA-Z])\s*\)/g, '\\sqrt{2$1$2}')
-    .replace(/t\s*=\s*v\s*\(\s*2\s*([^()]+)\/\s*([^()]+)\s*\)/g, 't = \\sqrt{\\frac{2$1}{$2}}');
+    .replace(/\b[vV]\s*\(\s*2\s*([a-zA-Z])\s*([a-zA-Z])\s*\)/g, '\\sqrt{2$1$2}')
+    .replace(/\b[vV]\s*\(\s*([^()]+\^2\s*\+\s*[^()]+\^2)\s*\)/g, '\\sqrt{$1}')
+    .replace(/t\s*=\s*[vV]\s*\(\s*2\s*([^()]+)\/\s*([^()]+)\s*\)/g, 't = \\sqrt{\\frac{2$1}{$2}}')
+    .replace(/\\sqrt\{\}\s*\(([^()]+)\)/g, '\\sqrt{$1}');
 
   // 3. تضمين الخطوط ومكتبة المعادلات KaTeX بالهيد إن لم تكن موجودة
   if (!cleanHtml.includes('fonts.googleapis.com') && cleanHtml.includes('<head>')) {
