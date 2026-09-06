@@ -11,7 +11,7 @@ export function extractLessonTitle(htmlCode, fallbackTitle = 'ملزمة جدي�
     if (titleMatch && titleMatch[1]) {
       let rawTitle = titleMatch[1].replace(/<[^>]+>/g, '').trim();
       rawTitle = rawTitle.replace(/سلسلة|المتفوق|–|-|—/g, ' ').trim();
-      const safeTitle = rawTitle.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_');
+      const safeTitle = rawTitle.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, '_').replace(/^_+|_+$/g, '');
       if (safeTitle.length > 2) {
         return safeTitle.slice(0, 50);
       }

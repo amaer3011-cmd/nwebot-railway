@@ -11,8 +11,10 @@ import { isUserAllowed } from './adminControl.js';
 import { generateInteractiveQuiz, generateQuizPdf, generateSelfGradingHtmlQuiz } from './quizGenerator.js';
 import { processGeneratedHtml } from './fontsHelper.js';
 import { getApiKeyPool, hasValidApiKey, getPrimaryApiKey } from './apiKeyManager.js';
+import { getUserSession, markSessionsDirty, flushSessions } from './sessionStore.js';
+import { sanitizeDocumentHtml, publicErrorMessage } from './htmlSecurity.js';
 
-dotenv.config({ override: true });
+dotenv.config({ override: false });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,6 +35,7 @@ if (!hasValidApiKey()) {
 }
 
 const bot = new Bot(botToken || 'DUMMY_TOKEN');
+let botReady = false;
 
 // 🛡️ حماية السيرفر من الانهيار عند حدوث انقطاع مؤقت في شبكة تليجرام (ECONNRESET / ETIMEDOUT)
 process.on('uncaughtException', (err) => {
@@ -73,6 +76,23 @@ async function safeEditMessageText(ctx, text, options = {}) {
   }
 }
 
+async function renderSafePdf(html, isLandscape = false) {
+  const sanitized = sanitizeDocumentHtml(html);
+  return renderHtmlDirectlyToPdf(sanitized, isLandscape);
+}
+
+async function fetchTelegramFile(url, timeoutMs = 120000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`تعذر تنزيل الملف من Telegram (HTTP ${response.status})`);
+    return response;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // 🛡️ حماية الـ Callbacks من أخطاء انتهاء الصلاحية (Query too old)
 bot.use(async (ctx, next) => {
   if (ctx.callbackQuery) {
@@ -92,32 +112,12 @@ bot.use(async (ctx, next) => {
     await ctx.reply('⚠️ **عذراً، هذا البوت مخصص للمصرح لهم فقط.**\nيرجى التواصل مع الأدمن للحصول على صلاحية الاستخدام.', { parse_mode: 'Markdown' });
     return;
   }
-  await next();
-});
-
-// 💾 2. إدارة جلسات المستخدمين (تخزين ملف الـ HTML الأخير + مكتبة الدروس السابقة)
-const userSessions = new Map();
-
-function getUserSession(chatId) {
-  if (!userSessions.has(chatId)) {
-    userSessions.set(chatId, {
-      identity: '🎀 الورقة الملونة',
-      track: 'auto',
-      isPartner: true,
-      lastHtml: null,
-      lastTitle: null,
-      lastContentText: null,
-      awaitingEdit: false,
-      awaitingQuizTopic: false,
-      lessonHistory: [],
-      quizSettings: { count: 5, type: 'mcq', difficulty: 'mixed' }
-    });
+  try {
+    await next();
+  } finally {
+    markSessionsDirty();
   }
-  const s = userSessions.get(chatId);
-  if (!s.lessonHistory) s.lessonHistory = [];
-  if (!s.track) s.track = 'auto';
-  return s;
-}
+});
 
 // 🎨 3. الهويات البصرية المتاحة
 const IDENTITIES = [
@@ -698,7 +698,7 @@ async function handleQuizHtml(ctx, session, customContentText = null, customTitl
 
   } catch (err) {
     try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
-    await ctx.reply(`❌ **خطأ أثناء تصميم كويز الـ HTML التفاعلي:**\n\`${err.message}\``, { parse_mode: 'Markdown' });
+    await ctx.reply(`❌ **خطأ أثناء تصميم كويز الـ HTML التفاعلي:**\n\`${publicErrorMessage(err)}\``, { parse_mode: 'Markdown' });
   }
 }
 
@@ -795,7 +795,7 @@ async function handleQuizPoll(ctx, session, customContentText = null, customTitl
 
   } catch (err) {
     try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
-    await ctx.reply(`❌ **خطأ أثناء توليد الكويز:**\n\`${err.message}\``, { parse_mode: 'Markdown' });
+    await ctx.reply(`❌ **خطأ أثناء توليد الكويز:**\n\`${publicErrorMessage(err)}\``, { parse_mode: 'Markdown' });
   }
 }
 
@@ -833,7 +833,7 @@ async function handleQuizPdf(ctx, session, customContentText = null, customTitle
 
     // ⚡ توليد سريع ومباشر للـ PDF في الذاكرة
     const isLandscape = session.identity.includes('Landscape') || session.identity.includes('الصفحتين');
-    const pdfBuffer = await renderHtmlDirectlyToPdf(quizHtml, isLandscape);
+    const pdfBuffer = await renderSafePdf(quizHtml, isLandscape);
 
     try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
 
@@ -862,7 +862,7 @@ async function handleQuizPdf(ctx, session, customContentText = null, customTitle
 
   } catch (err) {
     try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
-    await ctx.reply(`❌ **خطأ أثناء تصميم كويز PDF:**\n\`${err.message}\``, { parse_mode: 'Markdown' });
+    await ctx.reply(`❌ **خطأ أثناء تصميم كويز PDF:**\n\`${publicErrorMessage(err)}\``, { parse_mode: 'Markdown' });
   }
 }
 
@@ -1036,7 +1036,7 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
     // ⚡ توليد سريع ومباشر للـ PDF في الذاكرة (In-Memory Buffer) دون الحاجة للقرص
     await updateProgress(ctx, statusMsg, 'تحويل ومراجعة ملف PDF', 90, 'جاري تحويل الملف، والتأكد من جاهزيته قبل الإرسال.');
     const isLandscape = session.identity.includes('Landscape') || session.identity.includes('الصفحتين');
-    const pdfBuffer = await renderHtmlDirectlyToPdf(htmlCode, isLandscape);
+    const pdfBuffer = await renderSafePdf(htmlCode, isLandscape);
 
     if (statusMsg) {
       try {
@@ -1068,7 +1068,7 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
     if (statusMsg) {
       try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
     }
-    await safeReply(ctx, `❌ **عذراً، حدث خطأ أثناء إعداد الملزمة:**\n\`${err.message}\`\n\n💡 _يرجى إعادة المحاولة أو تجربة صياغة الطلب بشكل آخر._`, { parse_mode: 'Markdown' });
+    await safeReply(ctx, `❌ **عذراً، حدث خطأ أثناء إعداد الملزمة:**\n\`${publicErrorMessage(err)}\`\n\n💡 _يرجى إعادة المحاولة أو تجربة صياغة الطلب بشكل آخر._`, { parse_mode: 'Markdown' });
   } finally {
     clearInterval(heartbeatTimer);
   }
@@ -1097,7 +1097,7 @@ bot.on('message:photo', async (ctx) => {
     const file = await ctx.api.getFile(highestResPhoto.file_id);
     const fileUrl = `https://api.telegram.org/file/bot${botToken}/${file.file_path}`;
     
-    const response = await fetch(fileUrl);
+    const response = await fetchTelegramFile(fileUrl);
     const arrayBuffer = await response.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
 
@@ -1144,7 +1144,7 @@ bot.on('message:photo', async (ctx) => {
 
   } catch (err) {
     console.error('خطأ في استلام الصورة:', err);
-    await ctx.reply(`❌ حدث خطأ أثناء تحميل الصورة: ${err.message}`);
+    await ctx.reply(`❌ حدث خطأ أثناء تحميل الصورة: ${publicErrorMessage(err)}`);
   }
 });
 
@@ -1156,7 +1156,7 @@ bot.on(['message:voice', 'message:audio'], async (ctx) => {
     const file = await ctx.api.getFile(audioObj.file_id);
     const fileUrl = `https://api.telegram.org/file/bot${botToken}/${file.file_path}`;
     
-    const response = await fetch(fileUrl);
+    const response = await fetchTelegramFile(fileUrl);
     const arrayBuffer = await response.arrayBuffer();
     const audioBuffer = Buffer.from(arrayBuffer);
 
@@ -1174,7 +1174,7 @@ bot.on(['message:voice', 'message:audio'], async (ctx) => {
     });
   } catch (err) {
     try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
-    await ctx.reply(`❌ حدث خطأ أثناء تحليل الصوت: ${err.message}`);
+    await ctx.reply(`❌ حدث خطأ أثناء تحليل الصوت: ${publicErrorMessage(err)}`);
   }
 });
 
@@ -1267,7 +1267,7 @@ bot.on('message:text', async (ctx) => {
   if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html') || (text.includes('<head>') && text.includes('<body>') && text.includes('</html>'))) {
     const statusMsg = await ctx.reply('🌐 **تم التعرف على كود HTML مباشر! جاري معالجته في الذاكرة وإعداد ملف الـ PDF...**');
     try {
-      const processedHtml = processGeneratedHtml(text);
+      const processedHtml = processGeneratedHtml(sanitizeDocumentHtml(text));
       const lessonTitle = extractLessonTitle(processedHtml, 'ملزمة_HTML_مباشرة');
 
       session.lastHtml = processedHtml;
@@ -1288,7 +1288,7 @@ bot.on('message:text', async (ctx) => {
 
       const pdfFilename = `${lessonTitle}.pdf`;
       const isLandscape = session.identity.includes('Landscape') || session.identity.includes('الصفحتين');
-      const pdfBuffer = await renderHtmlDirectlyToPdf(processedHtml, isLandscape);
+      const pdfBuffer = await renderSafePdf(processedHtml, isLandscape);
 
       try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
 
@@ -1318,7 +1318,7 @@ bot.on('message:text', async (ctx) => {
 
     } catch (err) {
       try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
-      await ctx.reply(`❌ **خطأ أثناء معالجة كود الـ HTML:**\n\`${err.message}\``, { parse_mode: 'Markdown' });
+      await ctx.reply(`❌ **خطأ أثناء معالجة كود الـ HTML:**\n\`${publicErrorMessage(err)}\``, { parse_mode: 'Markdown' });
     }
     return;
   }
@@ -1339,7 +1339,7 @@ bot.on('message:text', async (ctx) => {
       });
     } catch (err) {
       try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
-      await ctx.reply(`❌ ${err.message}`);
+      await ctx.reply(`❌ ${publicErrorMessage(err)}`);
     }
   } else {
     await processAndSendHtml(ctx, {
@@ -1363,7 +1363,7 @@ bot.on('message:document', async (ctx) => {
     try {
       const file = await ctx.getFile();
       const fileUrl = `https://api.telegram.org/file/bot${botToken}/${file.file_path}`;
-      const response = await fetch(fileUrl);
+      const response = await fetchTelegramFile(fileUrl);
       const rawHtml = await response.text();
 
       try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
@@ -1381,7 +1381,7 @@ bot.on('message:document', async (ctx) => {
       }
 
       // معالجة الـ HTML وتجهيزه وتصدير الـ PDF في الذاكرة مباشرة
-      const processedHtml = processGeneratedHtml(rawHtml);
+      const processedHtml = processGeneratedHtml(sanitizeDocumentHtml(rawHtml));
       const lessonTitle = extractLessonTitle(processedHtml, doc.file_name.replace(/\.(html|htm)$/i, ''));
 
       session.lastHtml = processedHtml;
@@ -1402,7 +1402,7 @@ bot.on('message:document', async (ctx) => {
 
       const pdfFilename = `${lessonTitle}.pdf`;
       const isLandscape = session.identity.includes('Landscape') || session.identity.includes('الصفحتين');
-      const pdfBuffer = await renderHtmlDirectlyToPdf(processedHtml, isLandscape);
+      const pdfBuffer = await renderSafePdf(processedHtml, isLandscape);
 
       await ctx.replyWithDocument(new InputFile(pdfBuffer, pdfFilename), {
         caption: `
@@ -1430,7 +1430,7 @@ bot.on('message:document', async (ctx) => {
 
     } catch (err) {
       try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
-      await ctx.reply(`❌ **خطأ أثناء قراءة ملف الـ HTML:**\n\`${err.message}\``, { parse_mode: 'Markdown' });
+      await ctx.reply(`❌ **خطأ أثناء قراءة ملف الـ HTML:**\n\`${publicErrorMessage(err)}\``, { parse_mode: 'Markdown' });
     }
     return;
   }
@@ -1441,7 +1441,7 @@ bot.on('message:document', async (ctx) => {
     try {
       const file = await ctx.getFile();
       const fileUrl = `https://api.telegram.org/file/bot${botToken}/${file.file_path}`;
-      const response = await fetch(fileUrl);
+      const response = await fetchTelegramFile(fileUrl);
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
@@ -1456,7 +1456,7 @@ bot.on('message:document', async (ctx) => {
       });
     } catch (err) {
       try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
-      await ctx.reply(`❌ ${err.message}`);
+      await ctx.reply(`❌ ${publicErrorMessage(err)}`);
     }
     return;
   }
@@ -1467,10 +1467,12 @@ bot.on('message:document', async (ctx) => {
 // 🌐 HTTP Health Check Server لـ Railway (مطلوب لضمان استمرار التشغيل)
 const PORT = process.env.PORT || 3000;
 const healthServer = http.createServer((req, res) => {
-  if (req.url === '/health' || req.url === '/') {
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+  if (req.url === '/health' || req.url === '/' || req.url === '/ready') {
+    const isReady = botReady && hasValidApiKey();
+    res.writeHead(isReady ? 200 : 503, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({
-      status: 'ok',
+      status: isReady ? 'ok' : 'starting',
+      ready: isReady,
       bot: '@Studymate21_bot',
       service: 'Al-Motafawiq Bot — البكالوريا المصرية 2027',
       uptime: Math.floor(process.uptime()),
@@ -1485,13 +1487,23 @@ healthServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🌐 Health Check Server يعمل على المنفذ ${PORT}`);
 });
 
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.once(signal, () => {
+    flushSessions();
+    healthServer.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 5000).unref();
+  });
+}
+
 // 🚀 تشغيل البوت
 console.log('🚀 جاري تشغيل بوت «المتفوق» الذكي (إصدار PDF واحد باسم الدرس + ميزة التعديل)...');
 bot.start({
   onStart: (botInfo) => {
+    botReady = true;
     console.log(`✅ تم تشغيل البوت بنجاح تحت اسم: @${botInfo.username}`);
   }
 }).catch((err) => {
+  botReady = false;
   if (err.message && err.message.includes('DUMMY_TOKEN')) {
     console.log('⚠️ البوت جاهز، لكن يتطلب إدخال TELEGRAM_BOT_TOKEN في ملف .env ليتمكن من الاتصال بتليجرام.');
   } else {

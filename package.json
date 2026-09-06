@@ -6,14 +6,21 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "test": "node --test",
+    "lint": "eslint .",
+    "check": "node --check index.js && node --check aiService.js && node --check quizGenerator.js && node --check pdfRenderer.js && npm test"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
     "dotenv": "^16.4.7",
     "grammy": "^1.35.0",
     "pdf-parse": "^1.1.1",
-    "puppeteer": "^24.4.0",
+    "puppeteer": "^25.10.0",
+    "sanitize-html": "^2.17.7",
     "youtube-transcript": "^1.2.1"
+  },
+  "devDependencies": {
+    "eslint": "^10.10.0"
   }
 }

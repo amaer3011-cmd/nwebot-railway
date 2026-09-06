@@ -6,10 +6,11 @@ dotenv.config();
  */
 export function isUserAllowed(ctx) {
   const allowedConfig = process.env.ALLOWED_USER_IDS || process.env.ADMIN_IDS;
-  
-  // إذا لم يتم تحديد قائمة معينة، يكون البوت متاحاً للجميع تلقائياً
+  const requireAuth = String(process.env.REQUIRE_AUTH ?? 'true').toLowerCase() !== 'false';
+
+  // الوضع الآمن الافتراضي يرفض الاستخدام الجماعي عند غياب القائمة.
   if (!allowedConfig || allowedConfig.trim() === '') {
-    return true;
+    return !requireAuth;
   }
 
   const userId = String(ctx.from?.id || '');

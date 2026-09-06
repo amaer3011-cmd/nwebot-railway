@@ -11,6 +11,7 @@ yarn-error.log*
 
 # Temporary generated files
 temp/
+data/
 *.log
 
 # Operating system files

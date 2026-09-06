@@ -45,3 +45,12 @@
 # Railway deployment
 
 This Telegram bot is configured for Railway using Nixpacks. Set the variables in `.env.example` in Railway Project Variables before deploying. The service exposes `/health` on Railway’s `PORT`.
+
+## التشغيل الآمن والفحوصات
+
+- أصبح `REQUIRE_AUTH=true` هو الوضع الافتراضي. يجب ضبط `ALLOWED_USER_IDS` أو `ADMIN_IDS` قبل تشغيل البوت في الإنتاج.
+- يتم تعقيم HTML المرسل أو المرفوع قبل تمريره إلى Chromium، وتُحظر وسوم التنفيذ والخصائص الحدثية وقواعد CSS الخطرة.
+- تُحفظ جلسات المستخدمين في `SESSION_FILE` مع حفظ ذري مؤجل. على Railway يفضّل ربط المسار بـ Volume أو تخزين دائم.
+- يتطلب `/health` و`/ready` اكتمال اتصال Telegram ووجود مفتاح Gemini صالح حتى يعيدا حالة الجاهزية.
+- أوامر التحقق المحلية: `npm run check` و`npm run lint`.
+- تم تحديث Puppeteer إلى إصدار يعالج ثغرات `extract-zip`، ويجب إعادة اختبار إخراج PDF عند تغيير إصدار Chromium.

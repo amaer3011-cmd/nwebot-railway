@@ -73,7 +73,6 @@ async function getBrowser() {
         '--disable-default-apps',
         '--disable-sync',
         '--disable-extensions',
-        '--disable-web-security',
         '--renderer-process-limit=2',
         '--disable-features=Translate,BackForwardCache'
       ]
