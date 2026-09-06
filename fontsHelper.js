@@ -83,6 +83,13 @@ export function processGeneratedHtml(htmlCode) {
   // كما نعالج \text{...} حتى لا تظهر ككلمة خام داخل ملف PDF.
   cleanHtml = cleanHtml.replace(/\$([^$\n]+)\$/g, (_, expression) => `\\(${expression}\\)`);
   cleanHtml = cleanHtml.replace(/\\text\{([^{}]+)\}/g, '\\mathrm{$1}');
+  // إزالة بادئات OCR الغريبة حول أوامر KaTeX مع الإبقاء على الأمر القياسي.
+  cleanHtml = cleanHtml
+    .replace(/\\lambda\s*(?:sqrt|\\sqrt)\s*/gi, '\\sqrt')
+    .replace(/\\lambda\s*(?:frac|\\frac)\s*/gi, '\\frac')
+    .replace(/\\Stheta/gi, '\\theta')
+    .replace(/\b(?:Sis|SS)\s*(?=\\(?:sqrt|frac|vec|hat))/g, '')
+    .replace(/ولا تنسو الصلاة علي النبي/g, 'ولا تنسوا الصلاة على النبي');
   // تصحيح نمط OCR الشائع الذي يستبدل الجذر بالحرف v في القوانين.
   cleanHtml = cleanHtml
     .replace(/\b[vV]\s*\(\s*2\s*([a-zA-Z])\s*([a-zA-Z])\s*\)/g, '\\sqrt{2$1$2}')
