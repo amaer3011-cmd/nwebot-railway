@@ -49,6 +49,25 @@ function hasSourceEvidence(item, sourceText) {
   return evidence.length >= 8 && source.includes(evidence);
 }
 
+function sourceKeywords(sourceText) {
+  const stopWords = new Set(['من', 'في', 'على', 'إلى', 'عن', 'هذا', 'هذه', 'ذلك', 'تلك', 'هو', 'هي', 'ثم', 'أو', 'أي', 'كل', 'إذا', 'مع', 'كما', 'بين', 'عند', 'حيث', 'يتم', 'يمكن', 'يكون', 'كان', 'كانت', 'the', 'and', 'for', 'with']);
+  return [...new Set(normalizeEvidenceText(sourceText)
+    .split(/[^\p{L}\p{N}_]+/u)
+    .filter(word => word.length >= 4 && !stopWords.has(word)))];
+}
+
+function matchesSourceConcepts(item, sourceText) {
+  const keywords = sourceKeywords(sourceText);
+  if (keywords.length < 2) return true;
+  const questionText = normalizeEvidenceText([
+    item?.question,
+    ...(Array.isArray(item?.options) ? item.options : []),
+    item?.explanation
+  ].join(' '));
+  const overlap = keywords.filter(keyword => questionText.includes(keyword));
+  return new Set(overlap).size >= Math.min(2, keywords.length);
+}
+
 /**
  * مولّد الكويزات الاحترافي لبوت «المتفوق»
  * يدعم:
@@ -116,6 +135,7 @@ export async function generateInteractiveQuiz({
 أنت خبير تربوي متخصص في إنشاء كويزات من **الدرس المصدر المرفق فقط**.
 ⚠️ قاعدة أولوية مطلقة: لا تنشئ أي سؤال من معلومات عامة أو من مادة أخرى. كل سؤال وكل إجابة وتفسير يجب أن يكون قابلاً للإسناد إلى النص المرجعي أدناه.
 ⚠️ إذا كان النص درس فيزياء، فكل الأسئلة فيزياء فقط؛ ممنوع أسئلة النحو أو البلاغة أو التاريخ أو الأحياء أو أي مادة لا تظهر في النص.
+⚠️ لا تستخدم مواصفات المنهج أو الإرشادات العامة أعلاه كمصدر للسؤال؛ المصدر الوحيد هو النص الموجود تحت عنوان «المحتوى العلمي المرجعي الوحيد المسموح باستخدامه». يجب أن تكون الإجابة قابلة للاستخراج أو الاستنتاج المباشر من هذا النص.
 📌 التخصص والمادة المستهدفة: **${subjectInfo.subjectName}** (${subjectInfo.trackTitle})
 
 المطلوب: قم بإنشاء ${count} سؤال بنمط: ${typePromptMap[quizType] || typePromptMap.mcq}
@@ -195,7 +215,8 @@ ${contentText.slice(0, 6000)}
             item.options.every(opt => typeof opt === 'string' && opt.trim().length > 0) &&
             Number.isInteger(Number(item.correctOptionIndex)) &&
             Number(item.correctOptionIndex) >= 0 && Number(item.correctOptionIndex) < item.options.length &&
-            hasSourceEvidence(item, contentText)
+            hasSourceEvidence(item, contentText) &&
+            matchesSourceConcepts(item, contentText)
           );
 
           if (validItems.length < count) {

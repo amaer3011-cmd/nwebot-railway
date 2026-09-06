@@ -727,6 +727,8 @@ async function handleQuizPoll(ctx, session, customContentText = null, customTitl
   const contentText = customContentText || session.lastContentText || extractTextFromHtml(session.lastHtml || '');
   const title = customTitle || session.lastTitle || 'الموضوع';
 
+  console.log(`🎯 مصدر الكويز التفاعلي: العنوان="${title}" | طول النص=${contentText.length} | معاينة="${contentText.slice(0, 180).replace(/\s+/g, ' ')}"`);
+
   if (!contentText || contentText.length < 20) {
     await ctx.reply('⚠️ لا يوجد محتوى كافٍ لإنشاء كويز. أرسل درساً أولاً أو استخدم خيار "كويز من موضوع جديد".');
     return;
@@ -797,6 +799,8 @@ async function handleQuizPoll(ctx, session, customContentText = null, customTitl
 async function handleQuizPdf(ctx, session, customContentText = null, customTitle = null) {
   const contentText = customContentText || session.lastContentText || extractTextFromHtml(session.lastHtml || '');
   const title = customTitle || session.lastTitle || 'كويز المتفوق';
+
+  console.log(`🎯 مصدر كويز PDF: العنوان="${title}" | طول النص=${contentText.length} | معاينة="${contentText.slice(0, 180).replace(/\s+/g, ' ')}"`);
 
   if (!contentText || contentText.length < 20) {
     await ctx.reply('⚠️ لا يوجد محتوى كافٍ لإنشاء كويز PDF. أرسل درساً أولاً.');
