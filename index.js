@@ -934,8 +934,9 @@ async function updateProgress(ctx, statusMsg, stage, percent, detail) {
   if (!statusMsg) return;
   const filled = Math.round(percent / 10);
   const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
+  const text = `⏳ **${stage}**\n[${bar}] ${percent}%\n${detail}`;
   try {
-    await safeEditMessageText(ctx, `⏳ **${stage}**\n[${bar}] ${percent}%\n${detail}`, { parse_mode: 'Markdown' });
+    await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, text, { parse_mode: 'Markdown' });
   } catch (_) {}
 }
 
@@ -1133,15 +1134,19 @@ bot.on('message:photo', async (ctx) => {
         batch.captions.push(text);
       }
       batch.ctx = ctx; // تحديث الـ context لآخر رسالة
+      await updateProgress(ctx, batch.statusMsg, 'استلام الصور', Math.min(50, 20 + batch.images.length * 10), `تم استلام ${batch.images.length} صورة؛ جاري انتظار بقية الصور في الألبوم.`);
     } else {
       // بدء دفعة صور جديدة
+      const statusMsg = await ctx.reply('🖼️ **جاري استلام الصور وتجميعها قبل التحليل...**');
       batch = {
         images: [{ buffer: imageBuffer, mimeType: 'image/jpeg' }],
         captions: text ? [text] : [],
         ctx: ctx,
+        statusMsg,
         timeoutId: null
       };
       photoBatchMap.set(batchKey, batch);
+      await updateProgress(ctx, statusMsg, 'استلام الصور', 20, 'تم استلام أول صورة؛ جاري تجميع بقية الصور المرتبطة.');
     }
 
     // انتظار 2.5 ثانية لتجميع كل الصور المرسلة في ألبوم واحد أو متتابعة
@@ -1152,6 +1157,8 @@ bot.on('message:photo', async (ctx) => {
       if (!currentBatch || currentBatch.images.length === 0) return;
 
       const totalImages = currentBatch.images.length;
+      await updateProgress(currentBatch.ctx, currentBatch.statusMsg, 'اكتمال تجميع الصور', 55, `تم تجميع ${totalImages} صورة؛ جاري تحليلها كدرس واحد.`);
+      try { await currentBatch.ctx.api.deleteMessage(currentBatch.ctx.chat.id, currentBatch.statusMsg.message_id); } catch (_) {}
       const mergedCaption = currentBatch.captions.filter(Boolean).join(' - ') || 
         'قم بقراءة وفهم وتحليل كافة الصور والصفحات المرفقة معاً كدرس واحد متكامل، واستخراج كافة النصوص والمعادلات والأمثلة بالترتيب، وتوليد ملزمة واحدة شاملة تشمل الشرح المفصل، التطبيقات، وقسم «✍️ حِلّ بإيدك» المخطط ومفتاح الإجابات، وبنك أسئلة متوافق 100% مع البكالوريا 2027.';
 
@@ -1174,15 +1181,18 @@ bot.on('message:photo', async (ctx) => {
 bot.on(['message:voice', 'message:audio'], async (ctx) => {
   const statusMsg = await ctx.reply('🎙️ **جاري سحب وتفريغ الصوت الشرحي...**');
   try {
+    await updateProgress(ctx, statusMsg, 'استلام التسجيل الصوتي', 10, 'تم استلام التسجيل، وجاري تنزيله من Telegram.');
     const audioObj = ctx.message.voice || ctx.message.audio;
     const file = await ctx.api.getFile(audioObj.file_id);
     const fileUrl = `https://api.telegram.org/file/bot${botToken}/${file.file_path}`;
     
     const response = await fetchTelegramFile(fileUrl);
+    await updateProgress(ctx, statusMsg, 'تجهيز الصوت للتفريغ', 35, 'تم تنزيل التسجيل، وجاري إرساله لمحرك التفريغ والتحليل.');
     const arrayBuffer = await response.arrayBuffer();
     const audioBuffer = Buffer.from(arrayBuffer);
 
     const mimeType = ctx.message.voice ? 'audio/ogg' : (audioObj.mime_type || 'audio/mp3');
+    await updateProgress(ctx, statusMsg, 'اكتمل استلام الصوت', 55, 'تم تجهيز التسجيل؛ جاري بناء الملزمة وتحويلها إلى PDF.');
 
     try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
 
@@ -1383,15 +1393,17 @@ bot.on('message:document', async (ctx) => {
   if (fileName.endsWith('.html') || fileName.endsWith('.htm') || mimeType.includes('html')) {
     const statusMsg = await ctx.reply('🌐 **جاري قراءة واستيراد ملف الـ HTML مباشرة...**');
     try {
+      await updateProgress(ctx, statusMsg, 'استلام ملف HTML', 10, 'تم استلام الملف، وجاري تنزيله بأمان من Telegram.');
       const file = await ctx.getFile();
       const fileUrl = `https://api.telegram.org/file/bot${botToken}/${file.file_path}`;
       const response = await fetchTelegramFile(fileUrl);
+      await updateProgress(ctx, statusMsg, 'قراءة ملف HTML', 35, 'تم تنزيل الملف، وجاري قراءة المحتوى وتنظيف HTML قبل العرض.');
       const rawHtml = await response.text();
-
-      try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
 
       // إذا كان مع الملف كابشن يحتوي على طلب تعديل
       if (caption && caption.trim().length > 0) {
+        await updateProgress(ctx, statusMsg, 'تحضير التعديل', 55, 'تمت قراءة الملف، وجاري تمرير طلب التعديل إلى محرك المعالجة.');
+        try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
         session.lastHtml = rawHtml;
         session.lastTitle = doc.file_name.replace(/\.(html|htm)$/i, '');
         await processAndSendHtml(ctx, {
@@ -1403,6 +1415,7 @@ bot.on('message:document', async (ctx) => {
       }
 
       // معالجة الـ HTML وتجهيزه وتصدير الـ PDF في الذاكرة مباشرة
+      await updateProgress(ctx, statusMsg, 'تنظيف وتجهيز HTML', 60, 'جاري تعقيم المحتوى وحفظه في مكتبة الدروس.');
       const processedHtml = processGeneratedHtml(sanitizeDocumentHtml(rawHtml));
       const lessonTitle = extractLessonTitle(processedHtml, doc.file_name.replace(/\.(html|htm)$/i, ''));
 
@@ -1424,8 +1437,11 @@ bot.on('message:document', async (ctx) => {
 
       const pdfFilename = `${lessonTitle}.pdf`;
       const isLandscape = session.identity.includes('Landscape') || session.identity.includes('الصفحتين');
+      await updateProgress(ctx, statusMsg, 'تحويل HTML إلى PDF', 85, 'جاري تجهيز ملف PDF النهائي وإرساله لك.');
       const pdfBuffer = await renderSafePdf(processedHtml, isLandscape);
 
+      await updateProgress(ctx, statusMsg, 'اكتمل تجهيز ملف HTML', 100, 'تمت القراءة والتنظيف والتحويل بنجاح.');
+      try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
       await ctx.replyWithDocument(new InputFile(pdfBuffer, pdfFilename), {
         caption: `
 🌐 **تم قراءة واستيراد ملف الـ HTML بنجاح!** 📄
@@ -1461,13 +1477,16 @@ bot.on('message:document', async (ctx) => {
   if (fileName.endsWith('.pdf') || mimeType.includes('pdf')) {
     const statusMsg = await ctx.reply('📄 **جاري قراءة واستخراج مستند الـ PDF...**');
     try {
+      await updateProgress(ctx, statusMsg, 'استلام ملف PDF', 10, 'تم استلام الملف، وجاري تنزيله بأمان من Telegram.');
       const file = await ctx.getFile();
       const fileUrl = `https://api.telegram.org/file/bot${botToken}/${file.file_path}`;
       const response = await fetchTelegramFile(fileUrl);
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
+      await updateProgress(ctx, statusMsg, 'استخراج نص PDF', 45, 'تم تنزيل الملف، وجاري استخراج النص والصفحات للتحليل.');
       const extracted = await extractPdfText(buffer);
+      await updateProgress(ctx, statusMsg, 'اكتمل استخراج PDF', 65, `تم استخراج ${extracted.numpages} صفحة؛ جاري بدء تجهيز الملزمة.`);
       try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
 
       await ctx.reply(`✅ **تم استخراج ${extracted.numpages} صفحة من الـ PDF!** (${extracted.qualityRating})`);
