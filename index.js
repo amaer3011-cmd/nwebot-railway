@@ -199,7 +199,7 @@ bot.command('identity', async (ctx) => {
 bot.command('partner', async (ctx) => {
   const session = getUserSession(ctx.chat.id);
   session.isPartner = !session.isPartner;
-  await ctx.reply(`تم تحديث حالة الشراكة مع «بوت Thanawiyah 🎓»: ${session.isPartner ? '🟢 مفعّلة رسمياً' : '🔴 معطّلة'}`, {
+  await ctx.reply(`تم تحديث حالة الشراكة مع «بوت الثانوية العامة 🎓»: ${session.isPartner ? '🟢 مفعّلة رسمياً' : '🔴 معطّلة'}`, {
     reply_markup: getMainMenuKeyboard()
   });
 });
@@ -930,9 +930,15 @@ function reviewGeneratedLesson(html) {
   return { ok: problems.length === 0, problems, textLength: text.length };
 }
 
-async function updateProgress(ctx, statusMsg, stage, percent, detail) {
+const progressState = new Map();
+async function updateProgress(ctx, statusMsg, stage, percent, detail, force = false) {
   if (!statusMsg) return;
-  const filled = Math.round(percent / 10);
+  const key = String(ctx.chat?.id || statusMsg.message_id);
+  const now = Date.now();
+  const previous = progressState.get(key) || { at: 0, percent: -1 };
+  if (!force && now - previous.at < 2500 && percent < 100 && percent - previous.percent < 10) return;
+  progressState.set(key, { at: now, percent });
+  const filled = Math.max(0, Math.min(10, Math.round(percent / 10)));
   const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
   const text = `⏳ **${stage}**\n[${bar}] ${percent}%\n${detail}`;
   try {
@@ -1067,7 +1073,7 @@ async function processAndSendHtml(ctx, { prompt, sourceType, imageBuffer, imageM
       .text('💻 كود HTML الاحتياطي', 'get_backup_html')
       .text('🔙 القائمة الرئيسية', 'main_menu');
 
-    await updateProgress(ctx, statusMsg, 'اكتمل ملف HTML الشرح', 100, 'تمت المراجعة والتنسيق بنجاح، جاري إرسال ملف HTML فقط.');
+    await updateProgress(ctx, statusMsg, 'اكتمل ملف الشرح', 100, 'تمت المراجعة والتنسيق بنجاح، جاري إرسال الملف.', true);
     if (statusMsg) {
       try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (_) {}
     }

@@ -106,6 +106,21 @@ export const PRINT_LAYOUT_OVERRIDES = `
 </style>
 `;
 
+function arabizeVisibleLabels(html) {
+  const replacements = [
+    [/\bDownload PDF\b/gi, 'تحميل الملف'], [/\bPDF\b/gi, 'ملف مطبوع'],
+    [/\bQuestion(s)?\b/gi, 'أسئلة'], [/\bAnswer(s)?\b/gi, 'الإجابات'],
+    [/\bExplanation\b/gi, 'التعليل'], [/\bScore\b/gi, 'النتيجة'],
+    [/\bSubmit\b/gi, 'تسليم'], [/\bReset\b/gi, 'إعادة المحاولة'],
+    [/\bDifficulty\b/gi, 'الصعوبة'], [/\bSource\b/gi, 'المصدر'],
+    [/\bLearning Outcome\b/gi, 'ناتج التعلم'], [/\bAnalysis\b/gi, 'تحليل'],
+    [/\bInference\b/gi, 'استنتاج'], [/\bApplication\b/gi, 'تطبيق'],
+    [/\bUnderstanding\b/gi, 'فهم'], [/\bTrue\s*\/\s*False\b/gi, 'صواب أو خطأ'],
+    [/\bMCQ\b/gi, 'اختيار من متعدد'], [/\bThanawiyah\b/gi, 'الثانوية العامة']
+  ];
+  return replacements.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), html);
+}
+
 /**
  * تنظيف وحظر أي نصوص تمهيدية أو ختامية من الـ AI لضمان مخرج HTML نقي 100% مع دعم المعادلات ورابط القناة
  */
@@ -196,5 +211,5 @@ export function processGeneratedHtml(htmlCode) {
     cleanHtml = cleanHtml.replace('</body>', `${printToolbar}\n</body>`);
   }
 
-  return cleanHtml;
+  return arabizeVisibleLabels(cleanHtml);
 }
