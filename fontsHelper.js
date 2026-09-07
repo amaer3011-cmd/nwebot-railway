@@ -109,7 +109,8 @@ export const PRINT_LAYOUT_OVERRIDES = `
 function arabizeVisibleLabels(html) {
   const replacements = [
     [/\bDownload PDF\b/gi, 'تحميل الملف'], [/\bPDF\b/gi, 'ملف مطبوع'],
-    [/\bQuestion(s)?\b/gi, 'أسئلة'], [/\bAnswer(s)?\b/gi, 'الإجابات'],
+    [/\bQuestions\b/gi, 'أسئلة'], [/\bQuestion\b/gi, 'سؤال'],
+    [/\bAnswers\b/gi, 'الإجابات'], [/\bAnswer\b/gi, 'إجابة'],
     [/\bExplanation\b/gi, 'التعليل'], [/\bScore\b/gi, 'النتيجة'],
     [/\bSubmit\b/gi, 'تسليم'], [/\bReset\b/gi, 'إعادة المحاولة'],
     [/\bDifficulty\b/gi, 'الصعوبة'], [/\bSource\b/gi, 'المصدر'],
