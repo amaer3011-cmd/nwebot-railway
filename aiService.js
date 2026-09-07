@@ -251,9 +251,26 @@ ${lessonPlan || 'خطة مستخرجة داخلياً من المصدر فقط.'
           return !/<\/html>\s*$/i.test(source) || !/<div[^>]*class=["'][^"']*\bpg\b/i.test(source);
         };
         if (responseText && responseText.length > 50 && looksTruncated(responseText)) {
-          const compactParts = [...contentParts, { text: `\nإعادة إخراج إلزامية: المخرج السابق مبتور أو ناقص. أعد كتابة HTML كاملاً ومكتفياً بذاته من 2 إلى 6 صفحات A4 فقط، مع الحفاظ على كل المعلومات الأساسية. ابدأ بـ <!DOCTYPE html> وأنهِ بـ </html> ولا تكتب أي Markdown أو شرح خارج HTML.` }];
-          const compactResult = await model.generateContent(compactParts);
-          responseText = compactResult.response.text();
+          // المخرج قد يكون وصل إلى سقف التوكنات. في هذه الحالة نطلب الجزء
+          // الناقص ونلصقه بالمخرج الأصلي، حتى لا نفقد نصف الدرس أو مفتاح
+          // الإجابات بسبب إعادة كتابة عشوائية من الصفر.
+          if (/^\s*(<!doctype\s+html|<html)/i.test(responseText) && /\bpg\b/i.test(responseText)) {
+            const continuationPrompt = `\nاستكمال تقني فقط: هذا مخرج HTML بدأ بشكل صحيح لكنه انقطع عند آخر حرف بسبب حد الطول. أكمل من بعد آخر حرف مباشرة حتى إغلاق جميع الوسوم، وأكمل الصفحات وبنك التدريبات ومفتاح الإجابات الناقص. لا تعِد كتابة ما سبق، ولا تبدأ بـ <!DOCTYPE html> أو <html>، ولا تضع Markdown. المخرج السابق حتى نقطة الانقطاع:\n${responseText.slice(-12000)}`;
+            const continuation = await model.generateContent([
+              { text: continuationPrompt },
+              ...allImages.filter(img => img.buffer).slice(0, 2).map(img => ({ inlineData: { data: img.buffer.toString('base64'), mimeType: img.mimeType || 'image/jpeg' } }))
+            ]);
+            const tail = continuation.response.text()
+              .replace(/^\s*```(?:html)?/i, '')
+              .replace(/```\s*$/i, '')
+              .replace(/<!doctype\s+html[^>]*>|<html[^>]*>|<\/html>\s*$/gi, '');
+            if (tail.length > 20) responseText += tail;
+          }
+          if (looksTruncated(responseText)) {
+            const compactParts = [...contentParts, { text: `\nإعادة إخراج إلزامية: المخرج السابق مبتور أو ناقص. أعد كتابة HTML كاملاً ومكتفياً بذاته من 2 إلى 6 صفحات A4 فقط، مع الحفاظ على كل المعلومات الأساسية. ابدأ بـ <!DOCTYPE html> وأنهِ بـ </html> ولا تكتب أي Markdown أو شرح خارج HTML.` }];
+            const compactResult = await model.generateContent(compactParts);
+            responseText = compactResult.response.text();
+          }
         }
         if (responseText && responseText.length > 50) return processGeneratedHtml(responseText);
       } catch (err) {
