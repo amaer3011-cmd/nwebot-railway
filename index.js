@@ -808,8 +808,8 @@ async function handleQuizPdf(ctx, session, customContentText = null, customTitle
     return;
   }
 
-  const essayCount = 5;
-  const statusMsg = await ctx.reply(`📋 **جاري إعداد نسختي كويز PDF مقالي (5 أسئلة)...**
+  const essayCount = 10;
+  const statusMsg = await ctx.reply(`📋 **جاري إعداد نسختي كويز PDF مقالي (10 أسئلة)...**
 • نسخة مجابة بإجابات نموذجية
 • نسخة غير مجابة لمساحة الطالب
 • الصعوبة: ${getDifficultyName(session.quizSettings.difficulty)}`, { parse_mode: 'Markdown' });
@@ -845,7 +845,7 @@ async function handleQuizPdf(ctx, session, customContentText = null, customTitle
       caption: `📋 **النسخة المجابة — كويز «المتفوق»**
 
 📌 الموضوع: ${title.replace(/_/g, ' ')}
-📝 5 أسئلة مقالية مع خطوات الحل والإجابات النموذجية
+📝 10 أسئلة مقالية مع خطوات الحل والإجابات النموذجية
 
 🌟 نجتهد لنوفق 🌟`
     });

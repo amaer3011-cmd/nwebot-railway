@@ -19,7 +19,8 @@ const KATEX_BOOTSTRAP = `<script id="motafawiq-katex-bootstrap">window.addEventL
 export const PRINT_LAYOUT_OVERRIDES = `
 <style id="motafawiq-print-layout">
 	  @page { size: A4 portrait; margin: 0; }
-	  html, body { margin: 0 !important; padding: 0 !important; }
+		  html, body { margin: 0 !important; padding: 0 !important; }
+		  html { background: #fff !important; }
 	  body {
 	    overflow-x: hidden;
 	    font-family: 'Noto Sans Arabic', 'Tajawal', 'Cairo', sans-serif !important;
@@ -38,11 +39,20 @@ export const PRINT_LAYOUT_OVERRIDES = `
 	  ul, ol { padding-inline-start: 7mm !important; margin: 1.5mm 0 2.5mm !important; }
 	  .en, .english, [dir="ltr"] { font-family: 'Poppins', 'Cairo', sans-serif !important; }
   .pg {
-    min-height: 296mm !important;
-    height: 296mm !important;
+	    box-sizing: border-box !important;
+	    width: 210mm !important;
+	    min-height: 297mm !important;
+	    height: 297mm !important;
+	    max-height: 297mm !important;
     justify-content: flex-start !important;
-    overflow: hidden !important;
-  }
+	    overflow: hidden !important;
+	    margin: 0 !important;
+	    border-radius: 0 !important;
+	    box-shadow: none !important;
+	    break-after: page !important;
+	    page-break-after: always !important;
+	  }
+	  .pg:last-of-type { break-after: auto !important; page-break-after: auto !important; }
   .pg > .footer { margin-top: auto !important; }
 	  .content-wrapper { width: 100% !important; max-width: 100% !important; }
 	  .content-wrapper > * { max-width: 100% !important; }
@@ -79,14 +89,19 @@ export const PRINT_LAYOUT_OVERRIDES = `
 	    line-height: 1.65 !important;
 	  }
 	  .answer-key { line-height: 1.65 !important; }
-  .workspace-area {
-    min-height: 28mm !important;
+	  .workspace-area {
+	    min-height: 32mm !important;
     margin: 4mm 0 6mm !important;
     padding: 3mm !important;
     border: 1px dashed #94A3B8 !important;
-    background: repeating-linear-gradient(to bottom, transparent 0, transparent 8mm, #CBD5E1 8.2mm, transparent 8.5mm) !important;
-    break-inside: avoid !important;
-  }
+	    background: repeating-linear-gradient(to bottom, transparent 0, transparent 8mm, #CBD5E1 8.2mm, transparent 8.5mm) !important;
+	    break-inside: avoid !important;
+	  }
+	  .answer-key { break-before: auto !important; page-break-before: auto !important; }
+	  @media screen {
+	    body { background: #eef2f7 !important; }
+	    .pg { margin: 10px auto !important; border-radius: 18px !important; box-shadow: 0 10px 25px rgba(0,0,0,.12) !important; }
+	  }
 </style>
 `;
 
