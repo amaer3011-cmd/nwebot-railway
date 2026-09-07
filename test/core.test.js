@@ -16,6 +16,12 @@ test('sanitizeDocumentHtml removes executable content and event handlers', () =>
   assert.match(output, /درس/);
 });
 
+test('sanitized lesson keeps only the controlled print action', () => {
+  const output = sanitizeDocumentHtml('<html><body><button class="dl-btn" onclick="alert(1)">طباعة</button><div onclick="alert(2)">نص</div></body></html>');
+  assert.match(output, /class="dl-btn"[^>]*onclick="window\.print\(\)"/);
+  assert.doesNotMatch(output, /alert\(/);
+});
+
 test('publicErrorMessage bounds and normalizes user-facing errors', () => {
   assert.equal(publicErrorMessage(new Error('a\nb')), 'a b');
   assert.equal(publicErrorMessage(new Error('x'.repeat(300))), 'تعذر إكمال العملية حالياً. حاول مرة أخرى لاحقاً.');

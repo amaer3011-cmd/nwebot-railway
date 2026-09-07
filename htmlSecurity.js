@@ -37,9 +37,12 @@ export function sanitizeDocumentHtml(html) {
       return ['script', 'iframe', 'object', 'embed', 'form', 'input', 'textarea', 'select', 'base'].includes(tag);
     }
   });
-  return sanitized.replace(/(<style[^>]*>)([\s\S]*?)(<\/style>)/gi, (_, open, css, close) =>
+  const safeHtml = sanitized.replace(/(<style[^>]*>)([\s\S]*?)(<\/style>)/gi, (_, open, css, close) =>
     `${open}${css.replace(/@import|url\s*\(|expression\s*\(|behavior\s*:|-moz-binding/gi, '')}${close}`
   );
+  // يسمح فقط بزر الطباعة المعروف بإعادة فعل ثابت، وليس بأي JavaScript مولّد.
+  return safeHtml.replace(/<button(\s[^>]*class=["'][^"']*\b(?:dl-btn|motafawiq-print-btn)\b[^"']*["'][^>]*)>/gi,
+    '<button$1 onclick="window.print()">');
 }
 
 export function publicErrorMessage(error) {

@@ -178,12 +178,12 @@ export function processGeneratedHtml(htmlCode) {
   }
 
   // 4. زر الطباعة العائم ورابط القناة الرسمي
-  if (!cleanHtml.includes('window.print()')) {
+  if (!/class=["'][^"']*(?:dl-btn|motafawiq-print-btn)/i.test(cleanHtml)) {
     const printToolbar = `
     <div class="toolbar" style="position:fixed;top:15px;left:15px;z-index:9999;background:rgba(26,26,46,0.94);padding:8px 16px;border-radius:30px;box-shadow:0 8px 20px rgba(0,0,0,0.3);backdrop-filter:blur(6px);display:flex;align-items:center;gap:12px;">
       <span style="color:#FFF;font-family:sans-serif;font-size:0.85rem;font-weight:bold;">🌟 سلسلة «المتفوق»</span>
       <a href="https://t.me/+OAYxVF1Uqcs2NmE0" target="_blank" style="background:#2563EB;color:#FFF;text-decoration:none;padding:5px 14px;font-weight:bold;border-radius:20px;font-family:sans-serif;font-size:0.8rem;display:flex;align-items:center;gap:5px;">📢 انضم للقناة</a>
-      <button onclick="window.print()" style="background:linear-gradient(135deg,#F6CF3F,#F7941D);color:#1A1A2E;border:none;padding:6px 16px;font-weight:bold;border-radius:20px;cursor:pointer;font-family:sans-serif;box-shadow:0 3px 8px rgba(0,0,0,0.2);">⬇️ تحميل PDF / طباعة</button>
+      <button type="button" class="motafawiq-print-btn" style="background:linear-gradient(135deg,#F6CF3F,#F7941D);color:#1A1A2E;border:none;padding:6px 16px;font-weight:bold;border-radius:20px;cursor:pointer;font-family:sans-serif;box-shadow:0 3px 8px rgba(0,0,0,0.2);">⬇️ تحميل PDF / طباعة</button>
     </div>
     <style>
       @media print {
