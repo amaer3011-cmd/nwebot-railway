@@ -42,8 +42,8 @@ export const PRINT_LAYOUT_OVERRIDES = `
 	    box-sizing: border-box !important;
 	    width: 210mm !important;
 	    min-height: 297mm !important;
-	    height: 297mm !important;
-	    max-height: 297mm !important;
+	    height: auto !important;
+	    max-height: none !important;
     justify-content: flex-start !important;
 	    overflow: hidden !important;
 	    margin: 0 !important;

@@ -37,6 +37,23 @@ test('project no longer uses retired Gemini 2.5 fallback', async () => {
   assert.match(source, /CURRENT_MODEL\s*=\s*['"]gemini-3\.6-flash['"]/);
 });
 
+test('print layout allows pages to grow without fixed A4 clipping', async () => {
+  const [fonts, designs] = await Promise.all([
+    (await import('node:fs/promises')).readFile(new URL('../fontsHelper.js', import.meta.url), 'utf8'),
+    (await import('node:fs/promises')).readFile(new URL('../designCatalog.js', import.meta.url), 'utf8')
+  ]);
+  assert.doesNotMatch(`${fonts}\n${designs}`, /(?<!min-)height:\s*297mm|max-height:\s*297mm/);
+  assert.match(`${fonts}\n${designs}`, /min-height:\s*297mm/);
+  assert.match(fonts, /height:\s*auto/);
+});
+
+test('lesson rules reserve workspace for essay and numerical problems', async () => {
+  const source = await (await import('node:fs/promises')).readFile(new URL('../systemPrompt.js', import.meta.url), 'utf8');
+  assert.match(source, /لا تضع workspace-area بعد أسئلة الاختيار من متعدد/);
+  assert.match(source, /الحركة النسبية/);
+  assert.match(source, /5–8 أسئلة MCQ/);
+});
+
 test('extractLessonTitle creates a safe filename title', () => {
   assert.equal(extractLessonTitle('<html><head><title>المتفوق: الحركة/السرعة</title></head></html>'), 'الحركة_السرعة');
 });

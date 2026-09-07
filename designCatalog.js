@@ -40,7 +40,8 @@ body {
 
 .pg {
   width: 210mm;
-  height: 296mm;
+  min-height: 297mm;
+  height: auto;
   background: var(--paper);
   border: 3.5px solid var(--teal);
   border-radius: 18px;
@@ -387,7 +388,8 @@ body {
 
 .pg {
   width: 210mm;
-  height: 296mm;
+  min-height: 297mm;
+  height: auto;
   background: var(--paper);
   position: relative;
   overflow: hidden;
