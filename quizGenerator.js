@@ -391,7 +391,7 @@ ${questionMode === 'essay' ? '- أنشئ 5 أسئلة مقالية/تحليلي�
 - **عدد الأسئلة:** ${count} سؤال
 - **مستوى الصعوبة:** ${difficultyMap[difficulty] || difficultyMap.mixed}
 - **الهوية البصرية:** ${selectedIdentity}
-- **شراكة بوت Thanawiyah 🎓:** ${isPartner ? 'مفعّلة (إدراج شريط الشراكة أعلى الغلاف والعلامة المائية الشفافة)' : 'معطّلة'}
+- **شراكة بوت الثانوية العامة 🎓:** ${isPartner ? 'مفعّلة (إدراج شريط الشراكة أعلى الغلاف والعلامة المائية الشفافة)' : 'معطّلة'}
 
 🎓 مواصفات ومعايير أسئلة البكالوريا لمادة (${subjectInfo.subjectName}):
 ${subjectInfo.guidelines}
@@ -849,7 +849,7 @@ export async function generateSelfGradingHtmlQuiz({
 <div class="quiz-container">
   ${isPartner ? `
   <div class="partner-header">
-    <span>🎓 بشراكة رسمية مع بوت Thanawiyah للثانوية العامة</span>
+    <span>🎓 بشراكة رسمية مع بوت الثانوية العامة للثانوية العامة</span>
     <span style="background:var(--secondary);padding:2px 8px;border-radius:4px;font-weight:800;">سلسلة المتفوق 2027</span>
   </div>` : ''}
 
