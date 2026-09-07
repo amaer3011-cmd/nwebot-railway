@@ -22,5 +22,8 @@
   },
   "devDependencies": {
     "eslint": "^10.10.0"
+  },
+  "overrides": {
+    "htmlparser2": "9.1.0"
   }
 }
