@@ -57,7 +57,7 @@ export const PRINT_LAYOUT_OVERRIDES = `
 	  .content-wrapper { width: 100% !important; max-width: 100% !important; }
 	  .content-wrapper > * { max-width: 100% !important; }
   .section-header, .section-title, .card-simple, .card-def, .card-warn,
-  .card-trick, .card-gold, .concept-map, .question-card, .answer-key,
+	  .card-trick, .card-gold, .concept-map, .question-card, .question-item, .q-card, .quiz-card, .answer-key,
   table, tr, img { break-inside: avoid !important; page-break-inside: avoid !important; }
   .section-header, .section-title { break-after: avoid !important; page-break-after: avoid !important; }
   p { orphans: 3; widows: 3; }
@@ -76,7 +76,7 @@ export const PRINT_LAYOUT_OVERRIDES = `
   .formula-box .formula-title { font-weight: 800; color: #2B3445; margin-bottom: 2mm; }
   .formula-box + *, table + *, .katex-display + * { margin-top: 4mm !important; }
 	  table td, table th { padding: 2.5mm 3mm !important; vertical-align: middle; }
-	  .question-card, .q-card, .quiz-card {
+	  .question-card, .question-item, .q-card, .quiz-card {
 	    border-radius: 10px !important;
 	    padding: 4mm !important;
 	    margin: 0 0 4mm !important;
@@ -88,6 +88,7 @@ export const PRINT_LAYOUT_OVERRIDES = `
 	    margin: 1.5mm 0 !important;
 	    line-height: 1.65 !important;
 	  }
+	  .mcq-option, .options-list { display: block !important; line-height: 1.65 !important; }
 	  .answer-key { line-height: 1.65 !important; }
 	  .workspace-area {
 	    min-height: 32mm !important;
