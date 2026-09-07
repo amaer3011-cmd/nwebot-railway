@@ -25,6 +25,12 @@ test('getApiKeyPool deduplicates configured keys', () => {
   assert.deepEqual(getApiKeyPool(), ['first-key', 'second-key', 'third-key']);
 });
 
+test('project no longer uses retired Gemini 2.5 fallback', async () => {
+  const source = await (await import('node:fs/promises')).readFile(new URL('../aiService.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /PLAN_MODELS|\[modelName, ['"]gemini-2\.5-flash/);
+  assert.match(source, /CURRENT_MODEL\s*=\s*['"]gemini-3\.6-flash['"]/);
+});
+
 test('extractLessonTitle creates a safe filename title', () => {
   assert.equal(extractLessonTitle('<html><head><title>المتفوق: الحركة/السرعة</title></head></html>'), 'الحركة_السرعة');
 });

@@ -3,7 +3,18 @@ import { getSystemPrompt } from './systemPrompt.js';
 import { processGeneratedHtml } from './fontsHelper.js';
 import { getApiKeyPool } from './apiKeyManager.js';
 
-const PLAN_MODELS = ['gemini-2.5-flash'];
+// gemini-2.5-flash لم يعد متاحاً للمستخدمين الجدد.
+const CURRENT_MODEL = 'gemini-3.6-flash';
+const RETIRED_MODELS = new Set(['gemini-2.5-flash', 'gemini-3.5-flash']);
+
+function normalizeModelName(modelName) {
+  const candidate = String(modelName || '').trim();
+  return RETIRED_MODELS.has(candidate) ? CURRENT_MODEL : (candidate || CURRENT_MODEL);
+}
+
+function modelCandidates(modelName) {
+  return [...new Set([normalizeModelName(modelName), CURRENT_MODEL])];
+}
 
 function isQuotaError(error) {
   const message = String(error?.message || error || '');
@@ -41,7 +52,7 @@ export function extractLessonTitle(htmlCode, fallbackTitle = 'ملزمة جدي�
 export async function createLessonPlan({
   apiKey,
   userPrompt = '',
-  modelName = 'gemini-2.5-flash',
+  modelName = CURRENT_MODEL,
   imageBuffer = null,
   imageMimeType = 'image/jpeg',
   images = [],
@@ -71,7 +82,7 @@ ${userPrompt || 'حلل الصور أو الصوت المرفقين فقط.'}
   if (audioBuffer) parts.push({ inlineData: { data: audioBuffer.toString('base64'), mimeType: audioMimeType } });
   let lastError = null;
   for (const key of keyPool) {
-    for (const modelNameToTry of [...new Set([modelName, ...PLAN_MODELS])]) {
+    for (const modelNameToTry of modelCandidates(modelName)) {
       try {
         const model = new GoogleGenerativeAI(key).getGenerativeModel({
           model: modelNameToTry,
@@ -97,7 +108,7 @@ export async function generateLessonHtml({
   userPrompt,
   selectedIdentity = '🎀 الورقة الملونة',
   isPartner = true,
-  modelName = 'gemini-2.5-flash',
+  modelName = CURRENT_MODEL,
   imageBuffer = null,
   imageMimeType = 'image/jpeg',
   images = [],
@@ -115,7 +126,7 @@ export async function generateLessonHtml({
 
   const systemInstruction = getSystemPrompt(selectedIdentity, isPartner, `${userPrompt || ''}
 ${lessonPlan || ''}`, track);
-      const modelsToTry = [modelName, 'gemini-2.5-flash'];
+      const modelsToTry = modelCandidates(modelName);
   const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
   let lastError = null;
 
@@ -219,11 +230,21 @@ ${lessonPlan || 'خطة مستخرجة داخلياً من المصدر فقط.'
         }
 
         const result = await model.generateContent(contentParts);
-        const responseText = result.response.text();
+        let responseText = result.response.text();
 
-        if (responseText && responseText.length > 50) {
-          return processGeneratedHtml(responseText);
+        // عند بلوغ سقف التوكنات قد يترك النموذج HTML بلا </html>. لا نمرر
+        // المخرج المبتور إلى PDF؛ نطلب نسخة مكتملة ومضغوطة مرة واحدة على
+        // نفس المفتاح/النموذج قبل الانتقال إلى المفتاح التالي.
+        const looksTruncated = (value) => {
+          const source = String(value || '');
+          return !/<\/html>\s*$/i.test(source) || !/<div[^>]*class=["'][^"']*\bpg\b/i.test(source);
+        };
+        if (responseText && responseText.length > 50 && looksTruncated(responseText)) {
+          const compactParts = [...contentParts, { text: `\nإعادة إخراج إلزامية: المخرج السابق مبتور أو ناقص. أعد كتابة HTML كاملاً ومكتفياً بذاته من 2 إلى 6 صفحات A4 فقط، مع الحفاظ على كل المعلومات الأساسية. ابدأ بـ <!DOCTYPE html> وأنهِ بـ </html> ولا تكتب أي Markdown أو شرح خارج HTML.` }];
+          const compactResult = await model.generateContent(compactParts);
+          responseText = compactResult.response.text();
         }
+        if (responseText && responseText.length > 50) return processGeneratedHtml(responseText);
       } catch (err) {
         if (isQuotaError(err)) {
           lastError = quotaError();
@@ -244,12 +265,12 @@ export async function modifyLessonHtml({
   editInstructions,
   selectedIdentity = '🎀 الورقة الملونة',
   isPartner = true,
-  modelName = 'gemini-2.5-flash',
+  modelName = CURRENT_MODEL,
   track = 'auto'
 }) {
   const keyPool = getApiKeyPool(apiKey);
   const systemInstruction = getSystemPrompt(selectedIdentity, isPartner, editInstructions || existingHtml, track);
-  const modelsToTry = [modelName, 'gemini-2.5-flash'];
+  const modelsToTry = modelCandidates(modelName);
   const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
   let lastError = null;
 

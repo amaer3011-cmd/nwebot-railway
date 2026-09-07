@@ -20,7 +20,7 @@ const __dirname = path.dirname(__filename);
 
 const botToken = process.env.TELEGRAM_BOT_TOKEN;
 const geminiApiKey = getPrimaryApiKey();
-const defaultModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const defaultModel = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 const loadedKeys = getApiKeyPool();
 
 if (!botToken || botToken.trim() === '' || botToken.includes('your_telegram_bot_token_here')) {
