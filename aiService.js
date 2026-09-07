@@ -6,6 +6,7 @@ import { getApiKeyPool } from './apiKeyManager.js';
 // gemini-2.5-flash لم يعد متاحاً للمستخدمين الجدد.
 const CURRENT_MODEL = 'gemini-3.6-flash';
 const RETIRED_MODELS = new Set(['gemini-2.5-flash', 'gemini-3.5-flash']);
+const FALLBACK_MODELS = ['gemini-3.6-flash-lite', 'gemini-3.5-flash-lite'];
 
 function normalizeModelName(modelName) {
   const candidate = String(modelName || '').trim();
@@ -13,7 +14,16 @@ function normalizeModelName(modelName) {
 }
 
 function modelCandidates(modelName) {
-  return [...new Set([normalizeModelName(modelName), CURRENT_MODEL])];
+  return [...new Set([normalizeModelName(modelName), CURRENT_MODEL, ...FALLBACK_MODELS])];
+}
+
+function isTransientServiceError(error) {
+  const message = String(error?.message || error || '');
+  return error?.status === 503 || /503|service unavailable|high demand|temporarily unavailable/i.test(message);
+}
+
+async function pauseAfterTransientError() {
+  await new Promise(resolve => setTimeout(resolve, 1200));
 }
 
 function isQuotaError(error) {
@@ -96,6 +106,7 @@ ${userPrompt || 'حلل الصور أو الصوت المرفقين فقط.'}
           lastError = quotaError();
           break;
         }
+        if (isTransientServiceError(error)) await pauseAfterTransientError();
         lastError = error;
       }
     }
@@ -250,6 +261,7 @@ ${lessonPlan || 'خطة مستخرجة داخلياً من المصدر فقط.'
           lastError = quotaError();
           break;
         }
+        if (isTransientServiceError(err)) await pauseAfterTransientError();
         console.warn(`فشلت المحاولة بالمفتاح [${keyIndex + 1}/${keyPool.length}]:`, err.message);
         lastError = err;
       }
@@ -316,6 +328,7 @@ ${existingHtml}
           lastError = quotaError();
           break;
         }
+        if (isTransientServiceError(err)) await pauseAfterTransientError();
         lastError = err;
       }
     }
